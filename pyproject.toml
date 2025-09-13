@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dans-toolbox"
+version = "0.0.3"
+description = "A bunch of Python tools."
+readme = "README.md"
+authors = [
+    { name = "Dan Griffin", email = "dangffn@gmail.com" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dynamic = ["dependencies"]
+
+[project.scripts]
+toolbox = "toolbox:main.main"
+
+[tool.setuptools.packages]
+find = {}
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.pyright]
+strict = ["toolbox"]
+typeCheckingMode = "strict"
+exclude = ["**/__pycache__"]
+include = ["toolbox"]
