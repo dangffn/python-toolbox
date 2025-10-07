@@ -27,5 +27,5 @@ jobs:
 
     - name: Pytest
       run: |
-        pip install pytest
-        pytest
+        pip install pytest pytest-cov
+        pytest -v --cov=toolbox
