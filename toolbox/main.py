@@ -6,6 +6,7 @@ This project contains a collection of CLI based tools.
 """
 
 import argparse
+import sys
 
 from toolbox.subcommands.loader import init_subcommands
 from toolbox.logger import console_err
@@ -21,10 +22,15 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser(description="A bunch of commands and stuff")
 
+    # Initialize all configured subcommand handlers in the package.
     init_subcommands(parser)
 
     args = parser.parse_args()
-    func = args.__dict__.pop("func")
+    func = args.__dict__.pop("func", None)
+    if not func:
+        parser.print_help()
+        sys.exit(0)
+
     try:
         func(**args.__dict__)
     except (ValueError, AssertionError) as e:

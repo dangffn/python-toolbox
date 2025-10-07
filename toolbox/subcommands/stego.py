@@ -79,51 +79,11 @@ def record_op(kind: Literal["read", "write"]) -> Callable[..., Any]:
     return inner
 
 
-class DebugTools:
-    def __init__(self, cursor: "Cursor") -> None:
-        self.cursor = cursor
-
-    def _bit_string(self, op: Oper) -> str:
-        (pos, *_), (pos2, *_), count, _ = op
-        c = "O" if pos2 - pos == count else "!"
-        noop = "." * (pos * 8)
-        op_ = c * (count * 8)
-        return noop + op_
-
-    def _lsb_string(self, op: Oper) -> str:
-        string = self._bit_string(op)
-        return " ".join(
-            [
-                string[i : i + self.cursor.lsb]
-                for i in range(0, len(string), self.cursor.lsb)
-            ]
-        )
-
-    def _byte_string(self, op: Oper) -> str:
-        string = self._bit_string(op)
-        return " ".join([string[i : i + 8] for i in range(0, len(string), 8)])
-
-    def _explain_op(self, op: Oper) -> str:
-        kind = op[3]
-        prefix = f"<{kind.capitalize()}> P/I/B: {op[0][0]:>3}/{op[0][1]:>3}/{op[0][2]:>3} - Count:{op[2] or "!":>3}".ljust(
-            16, " "
-        )
-        return (
-            f"{prefix}\n\tLSB: {self._lsb_string(op)}\n\tByt: {self._byte_string(op)}"
-        )
-
-    def animate(self, delay: float = 0.5) -> None:
-        for op in self.cursor.operations:
-            console.clear()
-            console.print(self._explain_op(op))
-            time.sleep(delay)
-
-
 MAGIC_BYTES = b"=)"
 
 
 class Cursor:
-    """Records a position in an array so that the next bytes can be read from or written to it.
+    """Records byte index and LSB index into a color channel array for incremental IO.
 
     Data            : [1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0]
     Index (2)       : [. . .|. . .|1 0 1]
@@ -132,6 +92,9 @@ class Cursor:
     """
 
     def __init__(self, lsb: int=3) -> None:
+        # LSB, in this context, is the number of least significant bits to use to write binary data
+        # into the individual color channels per image pixel. Larger LSB values allow for more
+        # storage capacity, but further degrade the image quality.
         self.lsb = lsb
         self.operations: List[Oper] = []
         self.pos: int = 0
@@ -269,7 +232,7 @@ class Container:
     ) -> Iterator["Container"]:
         try:
             container = Container(filename)
-        except Exception as e:
+        except (FileNotFoundError, PermissionError) as e:
             console.log(f"Failed to open {filename} ({e})")
             sys.exit(1)
             
@@ -383,7 +346,12 @@ class Container:
             
     def format(self, strategy: Strategy) -> None:
         self.seek(0)
-        console.log(f"Formatting with strategy: [red]{strategy.__name__}[/red]")
+        strat = getattr(strategy, "__name__", "unknown")
+        console.log(f"Formatting with strategy: [red]{strat}[/red]")
+        # TODO: optimize me
+        # Note, this can be severely optimized, per-byte container writing is slow, the values can
+        # instead be written directly into the color channel array with numpy.
+        # I haven't gotten around to it yet, and the loading bar is neat ¯\_(ツ)_/¯.
         for _ in track(range(self.get_capacity()), description="Formatting..."):
             self.cursor.write(self.data, next(strategy))
         self.header.count = 0
@@ -394,11 +362,9 @@ def cat(file_path: str, out_file: str) -> None:
         write_byte_content(out_file, c.read())
         
         
-def write(file_path: str, data: str, animate: bool) -> None:
+def write(file_path: str, data: str) -> None:
     with Container.open(file_path) as c:
         c.write(read_byte_content(data))
-        if animate:
-            DebugTools(c.cursor).animate()
         
         
 def initialize(file_path: str, force: bool) -> None:
@@ -476,7 +442,6 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
     write_parser = subparsers.add_parser("write", help="Write data into an existing container")
     write_parser.add_argument("file_path", help="Image file container to write to")
     write_parser.add_argument("--data", default="-", help="Data to write into the container, default reads from stdin")
-    write_parser.add_argument("--animate", action="store_true", help="This is stupid, don't use it")
     write_parser.set_defaults(func=write)
     
     format_parser = subparsers.add_parser("format", help="Format the pixel channel LSBs, deleting all written data")
