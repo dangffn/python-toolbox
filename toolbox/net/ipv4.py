@@ -10,7 +10,7 @@ from toolbox.binary import get_mask
 
 AddressLike = Union[int, str, np.uint32, "Address"]
 
-local_subnets = [
+private_subnets = [
     "10.0.0.0/8",
     "172.16.0.0/12",
     "192.168.0.0/16",
@@ -63,9 +63,9 @@ class Address:
         return [int((self.integer >> shift) & 0xFF) for shift in [24, 16, 8, 0]]
     
     @property
-    def is_local_address(self) -> bool:
-        for local_subnet in local_subnets:
-            if self in Config(local_subnet):
+    def is_private(self) -> bool:
+        for private_subnet in private_subnets:
+            if self in Config(private_subnet):
                 return True
         return False
         
@@ -136,5 +136,5 @@ class Config:
             "wildcard_mask": str(self.subnet.wildcard_address),
             "first_usable": str(self.first_address),
             "last_usable": str(self.last_usable),
-            "private": self.address.is_local_address,
+            "private": self.address.is_private,
         }

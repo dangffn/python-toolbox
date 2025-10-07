@@ -35,3 +35,14 @@ class TestIPv4(TestCase):
         self.assertEqual(str(config.broadcast_address), '192.168.0.255')
         self.assertEqual(config.usable_addresses, 254)
         self.assertTrue("192.168.0.123" in config)
+        
+    def test_private_addresses(self) -> None:
+        # Private IP addresses.
+        self.assertTrue(Address('192.168.1.1').is_private)
+        self.assertTrue(Address('172.16.1.1').is_private)
+        self.assertTrue(Address('10.0.0.1').is_private)
+        
+        # Public IP addresses.
+        self.assertFalse(Address('1.1.1.1').is_private)
+        self.assertFalse(Address('192.169.1.1').is_private)
+        self.assertFalse(Address('172.15.255.255').is_private)
