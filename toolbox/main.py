@@ -7,11 +7,12 @@ This project contains a collection of CLI based tools.
 
 import argparse
 import sys
+from importlib import metadata
 
 from toolbox.subcommands.loader import init_subcommands
 from toolbox.logger import console_err
 
-__version__ = "1.0.0"
+__version__ = metadata.version('dans-toolbox')
 __author__ = "Dan Griffin"
 __maintainer__ = "Dan Griffin"
 __email__ = "dangffn@gmail.com"
@@ -21,6 +22,9 @@ def main() -> None:
     """Main entrypoint for the 'toolbox' CLI command.
     """
     parser = argparse.ArgumentParser(description="A bunch of commands and stuff")
+    parser.add_argument(
+        "-v", "--version", action="version", version=f"%(prog)s {__version__}"
+    )
 
     # Initialize all configured subcommand handlers in the package.
     init_subcommands(parser)
