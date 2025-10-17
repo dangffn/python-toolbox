@@ -2,8 +2,11 @@
 """Test cases for the stego subcommand.
 """
 
+import os
+import shutil
 from unittest import TestCase
 import numpy as np
+from PIL import Image
 
 from toolbox.subcommands.stego import Cursor, Container
 from toolbox.binary import split, get_mask
@@ -84,3 +87,31 @@ class TestContainer(TestCase):
     def test_container_write(self) -> None:
         self.container.write_from('abcd'.encode(), 0)
         self.assertEqual(self.container.read_from(4, 0), 'abcd'.encode())
+
+
+class TestImageIntegrity(TestCase):
+    def setUp(self) -> None:
+        img = Image.new("RGB", (10, 10), 255)
+        img.save("temp.png")
+        self.container = Container("temp.png")
+        
+    def tearDown(self) -> None:
+        os.remove("temp.png")
+        
+    def test_initialization(self) -> None:
+        val = (255, 0, 0)
+        loc = (9, 3)
+        pix = Image.open("temp.png").getpixel(loc)
+        self.assertEqual(val, pix, "sanity check")
+        
+        self.container.initialize()
+        self.container.save("temp.png")
+        
+        pix = Image.open("temp.png").getpixel(loc)
+        self.assertEqual(val, pix, "value changed after initialization")
+        
+        self.container.write("abcdefghijklmnop")
+        self.container.save("temp.png")
+        
+        pix = Image.open("temp.png").getpixel(loc)
+        self.assertEqual((254, 0, 2), pix, "LSBs incorrectly written!")

@@ -92,13 +92,11 @@ def do_mod(pixel_array: np.ndarray, key: np.ndarray, do_scramble: bool=True):
         diff = float(array.shape[1]) / array.shape[0]
         incr = 0
         r = diff if not do_scramble else -diff
-        print("Roll:", r)
         for i, row in enumerate(array):
             roll = int(-incr if do_scramble else incr)
             array[i] = np.roll(row, roll, 0)
             incr += diff
             r = incr
-        print("Roll:", r)
         return array
 
     def scramble(array: np.ndarray):

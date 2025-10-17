@@ -99,8 +99,8 @@ class Cursor:
         self.operations: List[Oper] = []
         self.pos: int = 0
         self.idx: int = 0
-        self.lsb_mask = (2**lsb) - 1
-        self.msb_mask = (2 ** (8 - lsb)) << lsb
+        self.lsb_mask = get_mask(lsb)
+        self.msb_mask = get_mask(8 - lsb) << lsb
 
     @classmethod
     def read_header(cls, lsb: int, array: NDArray[np.uint8]) -> Tuple[Header, int]:
@@ -201,12 +201,12 @@ class Cursor:
         
         bit_mask = np.uint8(0xFF & self.msb_mask)
         arr[:, 1] |= bit_mask
-
+        
         # Mask the existing bits.
-        array[self.idx : self.idx + len(arr)] &= arr[:, 1]
+        array[self.idx : self.idx + len(arr)] &= bit_mask #arr[:, 1]
         # Write in the new LSB bits.
         array[self.idx : self.idx + len(arr)] |= arr[:, 0]
-
+        
         self.seek(self.pos + len(data))
 
     def __str__(self) -> str:
