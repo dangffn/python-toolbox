@@ -168,34 +168,3 @@ def main(
 
             # save the new file
             save_image(enc, out_file, fmt=out_format)
-
-
-@register("scramble", description="Pixel scramble an image")
-def setup_parser(parser: argparse.ArgumentParser) -> None:
-    default_password = os.environ.get("SCRAMBLE_PASSWORD")
-
-    parser.add_argument("file_paths", nargs="+", help="File path(s) to images")
-    parser.add_argument(
-        "--password",
-        "-p",
-        default=default_password,
-        help="The password to use to scramble, defaults to environment variable SCRAMBLE_PASSWORD",
-    )
-    parser.add_argument(
-        "--unscramble",
-        "-u",
-        action="store_false",
-        dest="do_scramble",
-        help="Whether to unscramble instead of scramble",
-    )
-    parser.add_argument(
-        "--out-dir", default=None, help="The directory to save the resulting file to"
-    )
-    parser.add_argument(
-        "--out-format",
-        "-f",
-        choices=["PNG", "JPEG"],
-        default="PNG",
-        help="Store the resulting file in this format",
-    )
-    parser.set_defaults(func=main)

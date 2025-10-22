@@ -1,10 +1,8 @@
 import glob
 import os
-import argparse
 from PIL import Image
 from rich.progress import track
 
-from toolbox.subcommands.loader import register
 from toolbox.logger import console, console_err
 
 def extract_images_from_gif(gif_file: str, out_folder: str="out") -> bool:
@@ -65,29 +63,3 @@ def write_gif_from_frames(image_folder: str, out_file: str, duration: int=100) -
         )
     console.log(f"GIF saved to [green]{out_file}[/green]")
     return True
-
-@register("gif", description="Create and extract GIF images")
-def setup_subparsers(parser: argparse.ArgumentParser) -> None:
-    subparsers = parser.add_subparsers()
-    
-    # Gif -> images.
-    parser_extract = subparsers.add_parser("extract", help="Extract images from a Gif")
-    parser_extract.add_argument("gif_file", help="Path to the .gif file")
-    parser_extract.add_argument("--out-folder", default="out", help="Folder to save extracted frames to")
-    parser_extract.set_defaults(func=extract_images_from_gif)
-    
-    # Images -> Gif.
-    parser_build = subparsers.add_parser("build", help="Build a .gif from image frames")
-    parser_build.add_argument("image_folder", help="Directory containing images to combine into a .gif")
-    parser_build.add_argument("--out-file", default="./build.gif", help="Filename of the .gif to create")
-    parser_build.add_argument("--duration", type=int, default=80, help="The amount of time (ms) for each frame")
-    parser_build.set_defaults(func=write_gif_from_frames)
-    
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Gif extract & build")
-    subparsers = parser.add_subparsers(help="Subcommands")
-    setup_subparsers(subparsers)
-    
-    args = parser.parse_args()
-    func = args.__dict__.pop("func")
-    func(**args.__dict__)

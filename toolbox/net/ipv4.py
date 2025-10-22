@@ -94,11 +94,14 @@ class Subnet(Address):
 
 class Config:
     def __init__(self, addr: AddressLike, cidr: Optional[int]=None):
-        if type(addr) == str and cidr is None:
-            if "/" not in addr:
+        if isinstance(addr, str):
+            if "/" not in addr and cidr is None:
                 raise ValueError("Address must be in CIDR notation 0.0.0.0/0")
-            addr, cidr = addr.split("/", maxsplit=1)
-            cidr = int(cidr)
+            addr, cidr_parsed = addr.split("/", maxsplit=1)
+            cidr = cidr if cidr is not None else int(cidr_parsed)
+
+        if cidr is None:
+            raise ValueError("CIDR subnet must be specified")
             
         self.address = Address(addr)
         self.subnet = Subnet.from_cidr(cidr)

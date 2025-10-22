@@ -18,17 +18,22 @@ def show_ip(ip_address: str, output: Literal["print", "json"]) -> None:
         )
         for key, val in data.items():
             key = " ".join(key.capitalize().split("_"))
-            if type(val) == int:
+            if isinstance(val, int):
                 table.add_row(key, f"{val:,}")
             else:
                 table.add_row(key, str(val))
         console.print(table)
     else:
         print(json.dumps(data, indent=4))
+        
+
+@register("net", description="Network related utilities")
+def setup_net(parser: argparse.ArgumentParser) -> None:
+    parser.set_defaults(func=parser.print_help)
 
 
-@register("ipv4")
-def setup_parser(parser: argparse.ArgumentParser) -> None:
+@register("net", "ipv4", description="IPv4 related network utilities")
+def setup_net_ipv4(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("ip_address", help="IPv4 address in CIDR notation ie. 0.0.0.0/0")
     parser.add_argument("--output", default="print", choices=["print", "json"], help="Output format")
     parser.set_defaults(func=show_ip)

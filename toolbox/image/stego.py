@@ -1,7 +1,6 @@
 # pylint: disable=too-many-instance-attributes
 #!/usr/bin/env python3
 
-import argparse
 from dataclasses import dataclass
 from hashlib import sha256
 import sys
@@ -16,7 +15,6 @@ from typing import (
     Optional,
 )
 import os
-import time
 from random import randbytes
 from contextlib import contextmanager
 from PIL import Image
@@ -28,7 +26,6 @@ from rich.progress import track
 from rich.emoji import Emoji
 
 from toolbox.logger import console
-from toolbox.subcommands.loader import register
 from toolbox.utils import bytes_str, find, read_byte_content, write_byte_content
 from toolbox.binary import get_mask, split
 
@@ -415,44 +412,3 @@ def info(file_path: str) -> None:
         table.add_row("Visual integrity", f"{current_color_integrity:.2f}%", style=integrity_color)
         
         console.print(table)
-
-
-@register("stego", description="Image based steganography tools")
-def setup_parser(parser: argparse.ArgumentParser) -> None:
-
-    subparsers = parser.add_subparsers()
-
-    initialize_parser = subparsers.add_parser(
-        "initialize", help="Initialize a new image container"
-    )
-    initialize_parser.add_argument("file_path", help="Image file to convert to a container")
-    initialize_parser.add_argument("-f", "--force", action="store_true", help="Force re-initialize existing containers")
-    initialize_parser.set_defaults(func=initialize)
-    
-    validate_parser = subparsers.add_parser("validate", help="Validate the contents of a container")
-    validate_parser.add_argument("file_path", help="Image file to validate")
-    validate_parser.add_argument("--header-only", action="store_true", help="Only validate the contents of the header")
-    validate_parser.set_defaults(func=validate)
-    
-    cat_parser = subparsers.add_parser("cat", help="Dump the contents of an image container")
-    cat_parser.add_argument("file_path", help="Image file container to read")
-    cat_parser.add_argument("-o", "--out-file", default="-", help="Output file to write contents to, default stdout")
-    cat_parser.set_defaults(func=cat)
-    
-    write_parser = subparsers.add_parser("write", help="Write data into an existing container")
-    write_parser.add_argument("file_path", help="Image file container to write to")
-    write_parser.add_argument("--data", default="-", help="Data to write into the container, default reads from stdin")
-    write_parser.set_defaults(func=write)
-    
-    format_parser = subparsers.add_parser("format", help="Format the pixel channel LSBs, deleting all written data")
-    format_parser.add_argument("file_path", help="Image file container to format")
-    format_group = format_parser.add_mutually_exclusive_group()
-    format_group.add_argument("--random", action="store_const", const=random_bytes(), dest="strategy", help="Format the data with random bytes")
-    format_group.add_argument("--zeros", action="store_const", const=fmt_zeros(), dest="strategy", help="Format the data with all 0s")
-    format_group.add_argument("--ones", action="store_const", const=fmt_ones(), dest="strategy", help="Format the data with all 1s")
-    format_parser.set_defaults(func=format, strategy=random_bytes())
-    
-    info_parser = subparsers.add_parser("info", help="Show container information")
-    info_parser.add_argument("file_path", help="Image file container to inspect")
-    info_parser.set_defaults(func=info)
-    

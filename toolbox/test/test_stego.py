@@ -8,7 +8,7 @@ from unittest import TestCase
 import numpy as np
 from PIL import Image
 
-from toolbox.subcommands.stego import Cursor, Container
+from toolbox.image.stego import Cursor, Container
 from toolbox.binary import split, get_mask
 
 
