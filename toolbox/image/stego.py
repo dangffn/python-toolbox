@@ -240,7 +240,7 @@ class Container:
         arr = self.data.reshape(shape)
         if self.preserve_alpha and self.get_bit_depth(self.img) == 4:
             # If alpha was ignored, load the alpha from the image.
-            orig = self.img_to_array(self.img, remove_alpha=False)
+            orig = self.img_to_array(self.img, remove_alpha=False).reshape((self.size[1], self.size[0], 4))
             # Write in only the RGB values.
             orig[:, :, :3] = arr
             arr = orig
