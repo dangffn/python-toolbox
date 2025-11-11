@@ -38,11 +38,11 @@ Strategy = Iterator[bytes]
 def random_bytes() -> Iterator[bytes]:
     while True:
         yield randbytes(1)
-        
+
 def fmt_zeros() -> Iterator[bytes]:
     while True:
         yield np.uint8(0).tobytes()
-        
+
 def fmt_ones() -> Iterator[bytes]:
     while True:
         yield np.uint8(0xFF).tobytes()
@@ -62,7 +62,7 @@ class Header:
 def record_op(kind: Literal["read", "write"]) -> Callable[..., Any]:
     def inner(func: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(self: "Cursor", *args: Any, **kwargs: Any) -> Any:
-            count: int = find(args, lambda a: isinstance(a, (int, str, bytes)))
+            count = find(args, lambda a: isinstance(a, (int, str, bytes))) or 0
             if isinstance(count, (str, bytes)):
                 count = len(count)
             start = self.seek(None)
@@ -175,7 +175,7 @@ class Cursor:
         while count > 0:
             self.idx += 1
             bits += self.lsb
-            q = q << self.lsb
+            q = np.uint16(q << self.lsb)
             q |= array[self.idx] & self.lsb_mask
             if bits >= 8:
                 yield np.uint8(q >> (bits - 8)).tobytes()
@@ -211,16 +211,48 @@ class Cursor:
 
 
 class Container:
-    def __init__(self, filename: str, lsb: int = 2) -> None:
+    _supported_formats = ["RGB", "RGBA"]
+
+    def __init__(self, filename: str, lsb: int = 2, preserve_alpha=True) -> None:
         self.filename = os.path.abspath(filename)
         self.lsb = lsb
         self.img = Image.open(filename)
         self.size = self.img.size
-        assert self.img.mode == "RGB", f"Unsupported image mode {self.img.mode}"
-        self.data = np.asarray(self.img, dtype=np.uint8).flatten()
+        self.preserve_alpha = preserve_alpha
+        assert (
+            self.img.mode in self._supported_formats
+        ), f"Unsupported image mode {self.img.mode}"
+        self.data = self.img_to_array(self.img, remove_alpha=self.preserve_alpha)
         self.header, self.header_end = Cursor.read_header(self.lsb, self.data)
         self.cursor: Cursor = Cursor(lsb)
         self.cursor.seek(self.header_end)
+
+    @staticmethod
+    def img_to_array(img: Image.Image, remove_alpha: bool) -> NDArray[np.uint8]:
+        arr = np.asarray(img, dtype=np.uint8)
+        if remove_alpha and Container.get_bit_depth(img) == 4:
+            # Remove the alpha channel.
+            arr = arr[:, :, :3]
+        return arr.flatten()
+
+    def to_image(self) -> Image.Image:
+        shape = (self.size[1], self.size[0], 3)
+        arr = self.data.reshape(shape)
+        if self.preserve_alpha and self.get_bit_depth(self.img) == 4:
+            # If alpha was ignored, load the alpha from the image.
+            orig = self.img_to_array(self.img, remove_alpha=False)
+            # Write in only the RGB values.
+            orig[:, :, :3] = arr
+            arr = orig
+        return Image.fromarray(arr)
+
+    @staticmethod
+    def get_bit_depth(img: Image.Image) -> int:
+        if img.mode == "RGB":
+            return 3
+        elif img.mode == "RGBA":
+            return 4
+        return -1
 
     @contextmanager
     @staticmethod
@@ -232,7 +264,7 @@ class Container:
         except (FileNotFoundError, PermissionError) as e:
             console.log(f"Failed to open {filename} ({e})")
             sys.exit(1)
-            
+
         if initialize:
             container.initialize(force)
         yield container
@@ -304,16 +336,14 @@ class Container:
     def save(self, filename: Optional[str] = None) -> None:
         self.filename, _ = os.path.splitext(os.path.abspath(filename or self.filename))
         self.filename = f"{self.filename}.png"
-        
+
         with console.status(f"Saving [green]{self.filename}[/green]...") as status:
             self.header.checksum = self.calc_checksum()
             status.update("Writing header...")
             self.cursor.write_header(self.header, self.data)
-            
+
             status.update("Writing output image...")
-            shape = (self.size[1], self.size[0], 3)
-            img = Image.fromarray(self.data.reshape(shape))
-            img.save(self.filename)
+            self.to_image().save(self.filename)
 
     def seek(self, pos: Union[int, None]) -> Pos:
         # Constrain the container seek position to the header boundary.
@@ -340,7 +370,7 @@ class Container:
             )
         except AssertionError as e:
             console.log(f"[red]:x: Failed[/red] {e}")
-            
+
     def format(self, strategy: Strategy) -> None:
         self.seek(0)
         strat = getattr(strategy, "__name__", "unknown")
@@ -352,32 +382,32 @@ class Container:
         for _ in track(range(self.get_capacity()), description="Formatting..."):
             self.cursor.write(self.data, next(strategy))
         self.header.count = 0
-            
-            
+
+
 def cat(file_path: str, out_file: str) -> None:
     with Container.open(file_path) as c:
         write_byte_content(out_file, c.read())
-        
-        
+
+
 def write(file_path: str, data: str) -> None:
     with Container.open(file_path) as c:
         c.write(read_byte_content(data))
-        
-        
+
+
 def initialize(file_path: str, force: bool) -> None:
     with Container.open(file_path, initialize=True, force=force):
         pass
-    
+
 
 def validate(file_path: str, header_only: bool) -> None:
     with Container.open(file_path) as c:
         c.validate(header_only)
-        
-        
+
+
 def format(file_path: str, strategy: Strategy) -> None:
     with Container.open(file_path) as c:
         c.format(strategy)
-        
+
 
 def info(file_path: str) -> None:
     with Container.open(file_path) as c:
