@@ -87,7 +87,7 @@ wheels = [
 
 [[package]]
 name = "dans-toolbox"
-version = "0.0.6"
+version = "0.0.7"
 source = { editable = "." }
 dependencies = [
     { name = "linkify-it-py" },
@@ -106,7 +106,7 @@ dependencies = [
     { name = "uc-micro-py" },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 dev = [
     { name = "pyrefly" },
     { name = "pytest" },
@@ -124,16 +124,19 @@ requires-dist = [
     { name = "pillow", specifier = "==11.3.0" },
     { name = "platformdirs", specifier = "==4.5.0" },
     { name = "pygments", specifier = "==2.19.2" },
-    { name = "pyrefly", marker = "extra == 'dev'", specifier = "==0.41.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = "==8.4.2" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = "==7.0.0" },
     { name = "rich", specifier = "==14.2.0" },
     { name = "textual", specifier = "==6.2.1" },
     { name = "textual-imageview", specifier = "==0.1.1" },
     { name = "typing-extensions", specifier = "==4.15.0" },
     { name = "uc-micro-py", specifier = "==1.0.3" },
 ]
-provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pyrefly", specifier = "==0.41.0" },
+    { name = "pytest", specifier = "==8.4.2" },
+    { name = "pytest-cov", specifier = "==7.0.0" },
+]
 
 [[package]]
 name = "decorator"
