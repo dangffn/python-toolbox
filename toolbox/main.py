@@ -37,7 +37,7 @@ def main() -> None:
 
     try:
         func(**args.__dict__)
-    except (ValueError, AssertionError) as e:
+    except (ValueError, TypeError, AssertionError) as e:
         console_err.log(f"[red]Error[/red]: {e}")
 
 if __name__ == "__main__":

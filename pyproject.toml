@@ -23,7 +23,8 @@ dependencies = [
     "textual==6.2.1",
     "textual-imageview==0.1.1",
     "typing_extensions==4.15.0",
-    "uc-micro-py==1.0.3"
+    "uc-micro-py==1.0.3",
+    "moviepy==2.2.1"
 ]
 
 [project.optional-dependencies]
@@ -35,6 +36,9 @@ dev = [
 
 [project.scripts]
 toolbox = "toolbox:main.main"
+
+[tool.uv]
+package = true
 
 [tool.pyright]
 strict = ["toolbox"]
