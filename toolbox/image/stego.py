@@ -324,7 +324,7 @@ class Container:
     def write(self, data: Union[str, bytes]) -> None:
         assert self.header.is_valid(), "Attempt to write to an invalid container"
         with console.status("Writing data to pixel channel LSBs..."):
-            if type(data) == str:
+            if isinstance(data, str):
                 data = data.encode()
             self.cursor.write(self.data, data)
             self.header.count = len(data)

@@ -1,5 +1,5 @@
 """Register CLI subcommands on script startup."""
-from typing import Callable, Dict, Union, List, Optional, TypeVar, TypedDict, Any
+from typing import Callable, Dict, List, Optional, TypeVar, TypedDict
 from collections import defaultdict
 import argparse
 

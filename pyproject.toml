@@ -3,6 +3,7 @@ name = "dans-toolbox"
 version = "0.0.7"
 description = "A bunch of Python tools."
 readme = "README.md"
+requires-python = ">=3.12"
 authors = [
     { name = "Dan Griffin", email = "dangffn@gmail.com" },
 ]
@@ -32,6 +33,7 @@ dev = [
     "pytest==8.4.2",
     "pytest-cov==7.0.0",
     "pyrefly==0.41.0",
+    "ruff==0.14.6",
 ]
 
 [project.scripts]

@@ -1,1 +1,1 @@
-from toolbox.main import main
+from toolbox.main import main as main

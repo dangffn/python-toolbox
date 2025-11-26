@@ -1,4 +1,5 @@
 .vscode/
 *.egg-info/
+.coverage
 __pycache__/
 build/
