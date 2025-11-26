@@ -25,7 +25,8 @@ dependencies = [
     "textual-imageview==0.1.1",
     "typing_extensions==4.15.0",
     "uc-micro-py==1.0.3",
-    "moviepy==2.2.1"
+    "moviepy==2.2.1",
+    "paramiko==4.0.0"
 ]
 
 [dependency-groups]
