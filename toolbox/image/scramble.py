@@ -2,12 +2,10 @@
 
 import hashlib
 import os
-import argparse
 from typing import List, Optional, Union
 from PIL import Image
 import numpy as np
 
-from toolbox.subcommands.loader import register
 from toolbox.logger import console
 
 
@@ -91,12 +89,10 @@ def do_mod(pixel_array: np.ndarray, key: np.ndarray, do_scramble: bool=True):
         # width / height to determine the ratio for slanting evenly
         diff = float(array.shape[1]) / array.shape[0]
         incr = 0
-        r = diff if not do_scramble else -diff
         for i, row in enumerate(array):
             roll = int(-incr if do_scramble else incr)
             array[i] = np.roll(row, roll, 0)
             incr += diff
-            r = incr
         return array
 
     def scramble(array: np.ndarray):

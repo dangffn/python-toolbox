@@ -1,3 +1,5 @@
-import toolbox.subcommands.net
-import toolbox.subcommands.image
-import toolbox.subcommands.video
+import toolbox.subcommands.net as net
+import toolbox.subcommands.image as image
+import toolbox.subcommands.video as video
+
+__all__ = [net, image, video]

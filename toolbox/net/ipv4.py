@@ -42,10 +42,10 @@ class Address:
 
     @classmethod
     def parse(cls, addr: AddressLike) -> np.uint32:
-        if type(addr) == Address:
+        if isinstance(addr, Address):
             return addr.integer
         
-        elif type(addr) == str:
+        elif isinstance(addr, str):
             match = re.match(r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$', addr)
             if not match:
                 raise ValueError(f"Invalid IPv4 string '{addr}'")
@@ -53,7 +53,7 @@ class Address:
             octets: List[int] = [int(match.group(i + 1)) << shift for i, shift in enumerate([24, 16, 8, 0])]
             return np.uint32(reduce(lambda o1, o2: o1 | o2, octets, 0))
         
-        elif type(addr) == int and not 0 <= addr <= get_mask(32):
+        elif isinstance(addr, int) and not 0 <= addr <= get_mask(32):
             raise ValueError(f"Invalid IPv4 integer {addr}")
         
         return np.uint32(cast(int, addr))
