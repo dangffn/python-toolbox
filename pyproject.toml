@@ -1,6 +1,6 @@
 [project]
 name = "dans-toolbox"
-version = "0.0.6"
+version = "0.0.7"
 description = "A bunch of Python tools."
 readme = "README.md"
 authors = [
