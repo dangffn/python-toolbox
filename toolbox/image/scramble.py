@@ -1,16 +1,22 @@
 #!/usr/bin/python3
 
+from rich.table import Column
+from rich.table import Table
+from PIL.PngImagePlugin import PngInfo
 import hashlib
 import os
 from typing import List, Optional, Union
 from PIL import Image
 import numpy as np
+from pathlib import Path
 
 from toolbox.logger import console
 
 
 Pixels = np.ndarray[tuple[int, ...]]
 Indices = np.ndarray[tuple[int, ...]]
+
+META_KEY = "pixel-scramble"
 
 
 class ScrambleKey:
@@ -124,27 +130,38 @@ def do_mod(pixel_array: np.ndarray, key: np.ndarray, do_scramble: bool=True):
     return pixel_array
 
 
-def update_filename(filename: str, new_ext: str="png", new_dir: Optional[str]=None, suffix: Optional[str]=None):
-    new_dir = new_dir or os.path.dirname(filename)
-    basename = os.path.basename(filename)
+def get_metadata(image: Image.Image):
+    metadata = PngInfo()
+    
+    if image.info:
+        pass
+    
 
-    filename_only = ".".join(basename.split(".")[:-1])
-    new_file = (
-        f"{filename_only}-{suffix}.{new_ext}"
-        if suffix is not None
-        else f"{filename_only}.{new_ext}"
-    )
-
-    return os.path.join(new_dir, new_file)
+def show_meta(file_paths: List[str], **kwargs):
+    for filename in file_paths:
+        image = Image.open(filename)
+        if image.info:
+            table = Table(
+                Column("Key", style="white"),
+                Column("Value", style="cyan", width=50),
+                border_style="#444444",
+            )
+            for key, val in image.info.items():
+                table.add_column(str(key), str(val))
+                
+            console.print(table)
+        else:
+            console.log(f"{filename} has no metadata")
 
 
 def main(
     password: str,
     file_paths: List[str],
     do_scramble: bool,
-    out_dir: str,
+    output_path: str,
     out_format: str,
 ) -> None:
+    
     key = ScrambleKey(password or b"").array
 
     op = "Scrambling" if do_scramble else "Unscrambling"
@@ -157,8 +174,8 @@ def main(
             status.update(f"{op} [green]{filename}[/green]")
             enc = do_mod(pixel_array, key, do_scramble=do_scramble)
             new_ext = "png" if out_format == "PNG" else "jpg"
-            out_dir = out_dir or os.path.dirname(filename)
-            out_file = os.path.join(out_dir, os.path.basename(filename))
+            output_path = output_path or os.path.dirname(filename)
+            out_file = os.path.join(output_path, os.path.basename(filename))
             out_file, _ = os.path.splitext(out_file)
             out_file = f"{out_file}.{new_ext}"
 

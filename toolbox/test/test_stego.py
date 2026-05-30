@@ -2,6 +2,9 @@
 """Test cases for the stego subcommand.
 """
 
+import shutil
+from toolbox.utils import read_bytes
+import tempfile
 import os
 from unittest import TestCase
 import numpy as np
@@ -9,6 +12,7 @@ from PIL import Image
 
 from toolbox.image.stego import Cursor, Container
 from toolbox.binary import split, get_mask
+from toolbox.utils import pipe_bytes, write_bytes
 
 
 class TestCursor(TestCase):
@@ -86,6 +90,26 @@ class TestContainer(TestCase):
     def test_container_write(self) -> None:
         self.container.write_from('abcd'.encode(), 0)
         self.assertEqual(self.container.read_from(4, 0), 'abcd'.encode())
+        
+    def test_container_write_bytes(self):
+        self.container.write("abcdefg".encode("utf-8"))
+        self.container.seek(0)
+        self.assertEqual(self.container.read(3).decode(), "abc")
+        self.container.seek(0)
+        self.assertEqual(self.container.read(0).decode(), "")
+        self.container.seek(0)
+        self.assertEqual(self.container.read(10_000_000).decode(), "abcdefg")
+        self.container.seek(0)
+        self.assertEqual(self.container.read().decode(), "abcdefg")
+        
+    def test_container_pipes(self):
+        _, test_file_1 = tempfile.mkstemp("toolbox")
+        _, test_file_2 = tempfile.mkstemp("toolbox")
+        write_bytes(os.urandom(256), test_file_1)
+        pipe_bytes(test_file_1, self.container)
+        self.container.seek(0)
+        pipe_bytes(self.container, test_file_2)
+        self.assertEqual(read_bytes(test_file_1), read_bytes(test_file_2))
 
 
 class TestImageIntegrity(TestCase):

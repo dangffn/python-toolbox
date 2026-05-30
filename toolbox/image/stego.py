@@ -1,6 +1,8 @@
 # pylint: disable=too-many-instance-attributes
 #!/usr/bin/env python3
 
+from collections.abc import Buffer
+from typing import Generator
 from dataclasses import dataclass
 from hashlib import sha256
 import sys
@@ -14,6 +16,7 @@ from typing import (
     Union,
     Optional,
 )
+import io
 import os
 from random import randbytes
 from contextlib import contextmanager
@@ -26,8 +29,8 @@ from rich.progress import track
 from rich.emoji import Emoji
 
 from toolbox.logger import console
-from toolbox.utils import bytes_str, find, read_byte_content, write_byte_content
 from toolbox.binary import get_mask, split
+from toolbox.utils import bytes_writer, bytes_str, read_bytes, pipe_bytes, find
 
 
 Pos = Tuple[int, int, int]
@@ -210,7 +213,7 @@ class Cursor:
         return f"<Cursor: lsb={self.lsb} idx={self.idx} pos={self.pos} bits={self._get_bits()} />"
 
 
-class Container:
+class Container(io.RawIOBase):
     _supported_formats = ["RGB", "RGBA"]
 
     def __init__(self, filename: str, lsb: int = 2, preserve_alpha=True) -> None:
@@ -226,7 +229,20 @@ class Container:
         self.header, self.header_end = Cursor.read_header(self.lsb, self.data)
         self.cursor: Cursor = Cursor(lsb)
         self.cursor.seek(self.header_end)
-
+        
+    def readable(self):
+        return self.header.is_valid()
+    
+    def writable(self):
+        return self.header.is_valid()
+    
+    def readinto(self, b: bytearray | Buffer) -> int:
+        view: bytearray | memoryview = b if isinstance(b, bytearray) else memoryview(b)
+        data = self.read(len(b))
+        view[:len(data)] = data
+        console.log(f"READ: {data.decode()}")
+        return len(data)
+        
     @staticmethod
     def img_to_array(img: Image.Image, remove_alpha: bool) -> NDArray[np.uint8]:
         arr = np.asarray(img, dtype=np.uint8)
@@ -258,7 +274,7 @@ class Container:
     @staticmethod
     def open(
         filename: str, initialize: bool = False, force: bool = False
-    ) -> Iterator["Container"]:
+    ) -> Generator["Container", Any, Any]:
         try:
             container = Container(filename)
         except (FileNotFoundError, PermissionError) as e:
@@ -309,7 +325,7 @@ class Container:
         max_count = max_pos - self.cursor.pos
         if count is not None:
             if max_count < count:
-                console.log(f"Read past boundary ([red]{count:,}[/red] > {max_count:,})")
+                # console.log(f"Read past boundary ([red]{count:,}[/red] > {max_count:,})")
                 count = max_count
         else:
             count = max_count
@@ -321,11 +337,14 @@ class Container:
         self.write(data)
         self.seek(curr_pos)
 
-    def write(self, data: Union[str, bytes]) -> None:
+    def write(self, data: Union[str, bytes, Buffer]) -> None:
         assert self.header.is_valid(), "Attempt to write to an invalid container"
+        
         with console.status("Writing data to pixel channel LSBs..."):
             if isinstance(data, str):
                 data = data.encode()
+            if isinstance(data, Buffer):
+                data = bytes(data)
             self.cursor.write(self.data, data)
             self.header.count = len(data)
 
@@ -386,12 +405,12 @@ class Container:
 
 def cat(file_path: str, out_file: str) -> None:
     with Container.open(file_path) as c:
-        write_byte_content(out_file, c.read())
+        pipe_bytes(c, out_file)
 
 
 def write(file_path: str, data: str) -> None:
     with Container.open(file_path) as c:
-        c.write(read_byte_content(data))
+        pipe_bytes(data, c)
 
 
 def initialize(file_path: str, force: bool) -> None:

@@ -9,8 +9,11 @@ from PIL import Image
 
 from toolbox.subcommands.loader import register
 from toolbox.image.gif import extract_images_from_gif, write_gif_from_frames
-from toolbox.image.stego import initialize, validate, cat, write, fmt_ones, fmt_zeros, random_bytes, info
+from toolbox.image.stego import initialize, validate, cat, write, fmt_ones, fmt_zeros, random_bytes, info, format
 from toolbox.image.scramble import main as scramble_main
+from toolbox.image.scramble import show_meta as scramble_show_meta
+from toolbox.image.info import show_info
+from toolbox.image.convert import convert_images, converters
 
 
 @register("image", description="Image related utilities")
@@ -103,7 +106,39 @@ def setup_image_scramble(parser: argparse.ArgumentParser) -> None:
         default="PNG",
         help="Store the resulting file in this format",
     )
+    parser.add_argument(
+        "--show-meta",
+        action="store_const",
+        dest="func",
+        const=scramble_show_meta,
+        help="Show metadata only and exit."
+    )
     parser.set_defaults(func=scramble_main)
+    
+    
+@register("image", "convert", description="Image conversions")
+def setup_image_convert(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("filenames", nargs="+", help="Filenames to convert")
+    parser.add_argument("--overwrite", action="store_true", help="Overwrite if the new file exists")
+    parser.add_argument("--overwrite-existing", action="store_true", help="Overwrite the existing file with the converted one")
+    for key, val in converters.items():
+        parser.add_argument(
+            f"--{key}",
+            nargs="?",
+            action="append",
+            dest="converters",
+            const=val,
+            help=val.__doc__,
+        )
+    parser.set_defaults(func=convert_images, converters=[])
+    
+    
+@register("image", "info", description="Show image information")
+def setup_image_info(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("folder_path", help="Path to the folder containing images")
+    parser.add_argument("--sort", choices=["height", "width", "name", "size"], help="Sort the output table by this metric")
+    parser.add_argument("--reverse", action="store_true", help="Reverse the sort order")
+    parser.set_defaults(func=show_info)
 
 
 

@@ -1,20 +1,18 @@
 """Utility functions to make life easier.
 """
 
-from typing import TypeVar, Union, List, Tuple, Callable, Optional
-import sys
-import os
+from typing import TypeVar, Callable
 
 
 T = TypeVar("T")
 
 
-def find(array: Union[List[T], Tuple[T]], func: Callable[[T], bool]) -> Optional[T]:
+def find(array: list[T] | tuple[T], func: Callable[[T], bool]) -> T | None:
     """Similar to JavaScripts Array.find, return an item in an array that matches a 
     filter function criteria.
 
     Args:
-        array (Union[List[T], Tuple[T]]): list of items to search
+        array (Union[list[T], tuple[T]]): list of items to search
         func (Callable[[T], bool]): lambda returning True for a successful match
 
     Returns:
@@ -26,26 +24,7 @@ def find(array: Union[List[T], Tuple[T]], func: Callable[[T], bool]) -> Optional
     return None
 
 
-def read_byte_content(file_or_data: str) -> bytes:
-    if file_or_data == "-":
-        return sys.stdin.buffer.read()
-    if os.path.isfile(file_or_data):
-        with open(file_or_data, "rb") as infile:
-            return infile.read()
-    return file_or_data.encode()
-
-
-def write_byte_content(file: str, data: bytes) -> None:
-    if os.path.isfile(file):
-        with open(file, "wb") as outfile:
-            outfile.write(data)
-    elif file == "-":
-        sys.stdout.buffer.write(data)
-    else:
-        raise ValueError(f"Could not determine output file destination [{file}]")
-
-
-def bytes_str(num: float) -> str:
+def bytes_str(num: float | int) -> str:
     """Friendly number string. Ie: 12340 -> 12.34k
 
     :param int num: number to format
@@ -76,7 +55,7 @@ def time_delta_string(num: int) -> str:
         60: "minute",
         1: "sec"
     }
-    string: List[str] = []
+    string: list[str] = []
     for val, key in times.items():
         incr = int(num / val)
         if incr > 0:
