@@ -1,8 +1,11 @@
+from glob import glob
+from PIL import Image
 from typing import Literal
 import shutil
 import io
 from pathlib import Path
 from contextlib import contextmanager
+from hashlib import sha256
 import sys
 import os
 
@@ -66,7 +69,7 @@ def new_path_cleanup(path: Path | str, is_file: bool=True):
     to_delete: list[Path] = list(filter(lambda p: not p.exists(), [p, *p.parents]))
     
     try:
-        p.parent.mkdir(parents=True)
+        p.parent.mkdir(parents=True, exist_ok=True)
         p.touch(exist_ok=True) if is_file else p.mkdir(exist_ok=True)
         yield p
     except Exception:
@@ -85,3 +88,47 @@ def walk_dir(path: Path | str):
         for f in files:
             yield root / f
             
+            
+def list_dir(path: Path | str):
+    assert Path(path).is_dir(), f"{path} is not a directory"
+    for file in glob(f"{path}/*"):
+        if Path(file).is_file():
+            yield Path(file)
+            
+            
+def multi_file_arg(*path: Path | str):
+    """Specify multiple files, or a single directory.
+    If a directory is specified, return all files inside.
+    """
+    files = path
+    
+    if len(path) > 1:
+        files = filter(lambda p: Path(p).is_file(), list(path))
+    elif Path(path[0]).is_dir():
+        files = list_dir(path[0])
+        
+    files = list(map(Path, files))
+    assert len(files) > 0, "Specify multiple files or a single directory"
+    
+    return files
+
+
+def is_image(path: Path | str):
+    try:
+        with Image.open(str(path)) as img:
+            img.verify()
+        return True
+    except (SyntaxError, OSError):
+        return False
+    
+    
+def sha256_file(path: Readable):
+    sha = sha256()
+    with bytes_reader(path) as infile:
+        while True:
+            data = infile.read(65_536)
+            if not data:
+                break
+            sha.update(data)
+            
+    return sha.hexdigest()

@@ -23,14 +23,14 @@ def setup_image_gif(parser: argparse.ArgumentParser) -> None:
     # Gif -> images.
     parser_extract = subparsers.add_parser("extract", help="Extract images from a Gif")
     parser_extract.add_argument("gif_file", help="Path to the .gif file")
-    parser_extract.add_argument("--out-folder", default="out", help="Folder to save extracted frames to")
+    parser_extract.add_argument("--out-dir", default="out", help="Folder to save extracted frames to")
     parser_extract.set_defaults(func=gif.extract_images_from_gif)
     
     # Images -> Gif.
     parser_build = subparsers.add_parser("build", help="Build a .gif from image frames")
-    parser_build.add_argument("image_folder", help="Directory containing images to combine into a .gif")
-    parser_build.add_argument("--out-file", default="./build.gif", help="Filename of the .gif to create")
-    parser_build.add_argument("--duration", type=int, default=80, help="The amount of time (ms) for each frame")
+    parser_build.add_argument("file_paths", nargs="+", help="File paths of images to combine into the .gif")
+    parser_build.add_argument("--out-file", default="./build.gif", help="Output .gif file path")
+    parser_build.add_argument("--duration", type=int, default=50, help="The amount of time (ms) for each frame")
     parser_build.set_defaults(func=gif.write_gif_from_frames)
 
 @register("image", "stego", description="Image based steganography tools")
@@ -92,7 +92,7 @@ def setup_image_scramble(parser: argparse.ArgumentParser) -> None:
         help="Whether to unscramble instead of scramble",
     )
     parser.add_argument(
-        "--output-path", default=None, help="The directory to save the resulting file to"
+        "--out-dir", default=None, help="The directory to save the resulting file to"
     )
     parser.add_argument(
         "--out-format",

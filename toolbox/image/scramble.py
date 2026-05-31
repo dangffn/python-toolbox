@@ -1,14 +1,15 @@
 #!/usr/bin/python3
 
-from rich.table import Column
-from rich.table import Table
+from rich.table import Column, Table
 import hashlib
 import os
 from PIL import Image
 import numpy as np
 from pathlib import Path
+from typing import Literal
 
 from toolbox.logger import console
+from toolbox.utils import is_image, multi_file_arg, new_path_cleanup
 
 
 Pixels = np.ndarray[tuple[int, ...]]
@@ -73,7 +74,7 @@ def load_image(filename: Path | str) -> Pixels:
     return np.array(img)
 
 
-def save_image(arr: np.ndarray, filename: Path | str, fmt: str="PNG") -> None:
+def save_image(arr: np.ndarray, filename: Path | str, fmt: Literal["PNG", "JPEG"]="PNG") -> None:
     """Save the pixel array to a file.
     """
     data = Image.fromarray(arr)
@@ -157,31 +158,25 @@ def main(
     password: str,
     file_paths: list[Path | str],
     do_scramble: bool,
-    output_path: Path | str,
-    out_format: str,
+    out_dir: Path | str | None=None,
+    out_format: Literal["PNG", "JPEG"]="PNG",
 ) -> None:
+    image_paths = list(filter(is_image, multi_file_arg(*file_paths)))
+    
+    assert image_paths, "No images found"
     
     key = ScrambleKey(password or b"").array
-
     op = "Scrambling" if do_scramble else "Unscrambling"
+    new_ext = "png" if out_format == "PNG" else "jpg"
+    
     with console.status(op) as status:
-        for filename in file_paths:
-            p = Path(filename)
-            if not p.is_file():
-                console.log(f"{p} is not a file")
-                continue
-
+        for p in image_paths:
+            status.update(f"{op} [green]{p}[/green]")
+            
             initial_arr = load_image(p)
-            
-            status.update(f"{op} [green]{filename}[/green]")
-
             scrambled_arr = do_mod(initial_arr, key, do_scramble=do_scramble)
-            
-            new_ext = "png" if out_format == "PNG" else "jpg"
-            
-            output_path = Path(output_path or p.parent)
-            
-            out_file, _ = os.path.splitext(str(output_path / Path(filename).name))
-            out_file = Path(f"{out_file}.{new_ext}")
-            
-            save_image(scrambled_arr, out_file, fmt=out_format)
+
+            out_dir = Path(out_dir or p.parent)
+            with new_path_cleanup(out_dir, is_file=False):
+                out_name = os.path.splitext(p.name)[0] + f".{new_ext}"
+                save_image(scrambled_arr, out_dir / out_name, fmt=out_format)

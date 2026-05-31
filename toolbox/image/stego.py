@@ -5,7 +5,6 @@ from collections.abc import Buffer
 from typing import Generator
 from dataclasses import dataclass
 from hashlib import sha256
-import sys
 from typing import (
     Any,
     Callable,
@@ -274,12 +273,7 @@ class Container(io.RawIOBase):
     def open(
         filename: str, initialize: bool = False, force: bool = False
     ) -> Generator["Container", Any, Any]:
-        try:
-            container = Container(filename)
-        except (FileNotFoundError, PermissionError) as e:
-            console.log(f"Failed to open {filename} ({e})")
-            sys.exit(1)
-
+        container = Container(filename)
         if initialize:
             container.initialize(force)
         yield container

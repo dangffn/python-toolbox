@@ -18,10 +18,10 @@ __maintainer__ = "Dan Griffin"
 __email__ = "dangffn@gmail.com"
 
 
-def main() -> None:
+def run(argv: list[str]):
     """Main entrypoint for the 'toolbox' CLI command.
     """
-    parser = argparse.ArgumentParser(description="A bunch of commands and stuff")
+    parser = argparse.ArgumentParser(prog="toolbox", description="A bunch of commands and stuff")
     parser.add_argument(
         "-v", "--version", action="version", version=f"%(prog)s {__version__}"
     )
@@ -29,16 +29,23 @@ def main() -> None:
     # Initialize all configured subcommand handlers in the package.
     init_subcommands(parser)
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     func = args.__dict__.pop("func", None)
     if not func:
         parser.print_help()
-        sys.exit(0)
+        return 1
 
     try:
         func(**args.__dict__)
-    except (ValueError, TypeError, AssertionError) as e:
+        return 0
+    except (ValueError, TypeError, AssertionError, FileNotFoundError) as e:
         console_err.log(f"[red]Error[/red]: {e}")
+        return 1
+
+
+def main():
+    return run(sys.argv[1:])
+    
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

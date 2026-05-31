@@ -1,33 +1,20 @@
-import shutil
+import pytest
 from pathlib import Path
 import tempfile
 import os
-import pytest
+
 
 from toolbox.utils import pipe_bytes, read_bytes, new_path_cleanup
 
 
-test_data = os.urandom(1_024)
-
-
 class Ok(Exception):
     pass
-
-
-@pytest.fixture
-def cleanup_dir():
-    temp_dir = Path(tempfile.mkdtemp(prefix="toolbox-tests"))
-    yield temp_dir
-    shutil.rmtree(str(temp_dir))
     
 
 @pytest.fixture
 def test_files(cleanup_dir):
     _, f1 = tempfile.mkstemp(prefix=f"{cleanup_dir}/test-file")
     _, f2 = tempfile.mkstemp(prefix=f"{cleanup_dir}/test-file")
-    with open(f1, "wb") as outfile:
-        outfile.write(test_data)
-        
     yield f1, f2
     
     
@@ -78,6 +65,10 @@ def test_existing_files_kept(cleanup_dir):
 
 def test_pipe_bytes(test_files):
     f1, f2 = test_files
+    
+    test_data = os.urandom(1_024)
+    pipe_bytes(test_data, f1)
+    
     pipe_bytes(f1, f2)
     
     assert read_bytes(f1) == test_data, "Bad read"
