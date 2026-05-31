@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional, Union, List, cast
 import re
 import numpy as np
 
-from toolbox.binary import get_mask
+from toolbox.utils.binary import get_mask
 
 
 AddressLike = Union[int, str, np.uint32, "Address"]

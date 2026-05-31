@@ -2,7 +2,6 @@
 """Test cases for the stego subcommand.
 """
 
-import shutil
 from toolbox.utils import read_bytes
 import tempfile
 import os
@@ -11,7 +10,7 @@ import numpy as np
 from PIL import Image
 
 from toolbox.image.stego import Cursor, Container
-from toolbox.binary import split, get_mask
+from toolbox.utils.binary import split, get_mask
 from toolbox.utils import pipe_bytes, write_bytes
 
 

@@ -29,8 +29,8 @@ from rich.progress import track
 from rich.emoji import Emoji
 
 from toolbox.logger import console
-from toolbox.binary import get_mask, split
-from toolbox.utils import bytes_writer, bytes_str, read_bytes, pipe_bytes, find
+from toolbox.utils.binary import get_mask, split
+from toolbox.utils import bytes_str, pipe_bytes, find
 
 
 Pos = Tuple[int, int, int]
@@ -83,12 +83,11 @@ MAGIC_BYTES = b"=)"
 
 
 class Cursor:
-    """Records byte index and LSB index into a color channel array for incremental IO.
+    """Records byte index (pos) and LSB index (idx) inside a data array.
 
-    Data            : [1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0]
-    Index (2)       : [. . .|. . .|1 0 1]
-    Bits (1)        : [. . .|. . .|. . 1]
-    Position (1):   : [. . . . . . . .|1 0 1 0 1 0 1 0 1]
+    Data    : [1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0]
+    idx (2) : [. . .|. . .|1 0 1]
+    pos (1) : [. . . . . . . .|1 0 1 0 1 0 1 0]
     """
 
     def __init__(self, lsb: int=3) -> None:
@@ -238,7 +237,7 @@ class Container(io.RawIOBase):
     
     def readinto(self, b: bytearray | Buffer) -> int:
         view: bytearray | memoryview = b if isinstance(b, bytearray) else memoryview(b)
-        data = self.read(len(b))
+        data = self.read(len(view))
         view[:len(data)] = data
         console.log(f"READ: {data.decode()}")
         return len(data)

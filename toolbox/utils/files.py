@@ -77,3 +77,11 @@ def new_path_cleanup(path: Path | str, is_file: bool=True):
                 delete.rmdir()
         raise
             
+            
+def walk_dir(path: Path | str):
+    p = Path(path)
+    assert p.is_dir(), f"{path} is not a directory"
+    for root, folers, files in p.walk():
+        for f in files:
+            yield root / f
+            

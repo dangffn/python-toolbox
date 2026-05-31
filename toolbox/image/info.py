@@ -1,17 +1,10 @@
-
-from typing import Tuple
-from typing import TypeVar
-from typing import Generator
-from typing import TypedDict
-from typing import Union
-from typing import Literal
 from rich.table import Table
-from toolbox.file import iter_files
 import os
 from PIL import Image
+from typing import Tuple, TypeVar, Generator, TypedDict, Union, Literal, cast
 
 from toolbox.logger import console
-from toolbox.utils import bytes_str
+from toolbox.utils import bytes_str, walk_dir
 
 
 T = TypeVar("T")
@@ -28,14 +21,14 @@ class Info(TypedDict):
 
 
 def get_info(folder_path: str) -> Generator[Info, None, None]:
-    for filename in iter_files(folder_path):
+    for file_path in walk_dir(folder_path):
         try:
-            img = Image.open(filename)
+            img = Image.open(file_path)
             yield {
-                "name":os.path.basename(filename),
+                "name":os.path.basename(file_path),
                 "height": img.height,
                 "width": img.width,
-                "size": os.path.getsize(filename)
+                "size": os.path.getsize(file_path)
             }
         except Exception:
             pass
@@ -45,10 +38,10 @@ def format(key: Literal["size", "width", "height"], val: int) -> str: ...
 
 def format(key: Literal["name"], val: str) -> str: ...
         
-def format(data: Tuple[str, Union[int, str]]):
+def format(data: tuple[str, int | str]):
     key, val = data
     if key == "size":
-        return bytes_str(val)
+        return bytes_str(cast(int, val))
     elif key in ["width", "height"]:
         return f"{val:,}"
     return val

@@ -1,6 +1,6 @@
 
 from unittest import TestCase
-from toolbox.binary import get_mask
+from toolbox.utils.binary import get_mask
 from toolbox.net.ipv4 import Address, Config, is_valid
 
 

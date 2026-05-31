@@ -5,7 +5,6 @@ from rich.table import Table
 from PIL.PngImagePlugin import PngInfo
 import hashlib
 import os
-from typing import List, Optional, Union
 from PIL import Image
 import numpy as np
 from pathlib import Path
@@ -26,7 +25,7 @@ class ScrambleKey:
 
     size = 128
 
-    def __init__(self, key_data: Union[bytes, str]) -> None:
+    def __init__(self, key_data: bytes | str) -> None:
         if isinstance(key_data, str):
             key_data = key_data.encode("utf8")
         self._bytes = [i & 0xFF for i in hashlib.sha256(key_data).digest()]  # 32 bytes
@@ -49,8 +48,8 @@ class ScrambleKey:
         We can generate any length array based on the limited number of bytes in the key
         """
 
-        out: List[np.uint32] = []
-        arr: List[np.uint32] = list(np.arange(self.size, dtype=np.uint32))
+        out: list[np.uint32] = []
+        arr: list[np.uint32] = list(np.arange(self.size, dtype=np.uint32))
 
         for rot in range(0, 8, 2):
             for b in self._bytes:
@@ -70,16 +69,16 @@ class ScrambleKey:
         return self._arr.flatten()
 
 
-def load_image(filename: str) -> Pixels:
-    img = Image.open(filename)
+def load_image(filename: Path | str) -> Pixels:
+    img = Image.open(str(filename))
     return np.array(img)
 
 
-def save_image(arr: np.ndarray, filename: str, fmt: str="PNG") -> None:
+def save_image(arr: np.ndarray, filename: Path | str, fmt: str="PNG") -> None:
     """Save the pixel array to a file.
     """
     data = Image.fromarray(arr)
-    data.save(filename, format=fmt)
+    data.save(str(filename), format=fmt)
     console.log(f"Saved [green]{filename}[/green]")
 
 
@@ -131,13 +130,14 @@ def do_mod(pixel_array: np.ndarray, key: np.ndarray, do_scramble: bool=True):
 
 
 def get_metadata(image: Image.Image):
+    # TODO: complete
     metadata = PngInfo()
     
     if image.info:
         pass
     
 
-def show_meta(file_paths: List[str], **kwargs):
+def show_meta(file_paths: list[str], **kwargs):
     for filename in file_paths:
         image = Image.open(filename)
         if image.info:
@@ -156,9 +156,9 @@ def show_meta(file_paths: List[str], **kwargs):
 
 def main(
     password: str,
-    file_paths: List[str],
+    file_paths: list[Path | str],
     do_scramble: bool,
-    output_path: str,
+    output_path: Path | str,
     out_format: str,
 ) -> None:
     
@@ -167,17 +167,22 @@ def main(
     op = "Scrambling" if do_scramble else "Unscrambling"
     with console.status(op) as status:
         for filename in file_paths:
-            assert os.path.exists(filename), f"{filename} does not exist"
-            assert os.path.isfile(filename), "File path must be an image file"
+            p = Path(filename)
+            if not p.is_file():
+                console.log(f"{p} is not a file")
+                continue
 
-            pixel_array = load_image(filename)
+            initial_arr = load_image(p)
+            
             status.update(f"{op} [green]{filename}[/green]")
-            enc = do_mod(pixel_array, key, do_scramble=do_scramble)
-            new_ext = "png" if out_format == "PNG" else "jpg"
-            output_path = output_path or os.path.dirname(filename)
-            out_file = os.path.join(output_path, os.path.basename(filename))
-            out_file, _ = os.path.splitext(out_file)
-            out_file = f"{out_file}.{new_ext}"
 
-            # save the new file
-            save_image(enc, out_file, fmt=out_format)
+            scrambled_arr = do_mod(initial_arr, key, do_scramble=do_scramble)
+            
+            new_ext = "png" if out_format == "PNG" else "jpg"
+            
+            output_path = Path(output_path) or p.parent
+            
+            out_file, _ = os.path.splitext(str(output_path / Path(filename).name))
+            out_file = Path(f"{out_file}.{new_ext}")
+            
+            save_image(scrambled_arr, out_file, fmt=out_format)

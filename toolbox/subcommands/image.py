@@ -8,12 +8,7 @@ from textual_imageview.viewer import ImageViewer
 from PIL import Image
 
 from toolbox.subcommands.loader import register
-from toolbox.image.gif import extract_images_from_gif, write_gif_from_frames
-from toolbox.image.stego import initialize, validate, cat, write, fmt_ones, fmt_zeros, random_bytes, info, format
-from toolbox.image.scramble import main as scramble_main
-from toolbox.image.scramble import show_meta as scramble_show_meta
-from toolbox.image.info import show_info
-from toolbox.image.convert import convert_images, converters
+from toolbox.image import gif, stego, scramble, info, convert
 
 
 @register("image", description="Image related utilities")
@@ -29,14 +24,14 @@ def setup_image_gif(parser: argparse.ArgumentParser) -> None:
     parser_extract = subparsers.add_parser("extract", help="Extract images from a Gif")
     parser_extract.add_argument("gif_file", help="Path to the .gif file")
     parser_extract.add_argument("--out-folder", default="out", help="Folder to save extracted frames to")
-    parser_extract.set_defaults(func=extract_images_from_gif)
+    parser_extract.set_defaults(func=gif.extract_images_from_gif)
     
     # Images -> Gif.
     parser_build = subparsers.add_parser("build", help="Build a .gif from image frames")
     parser_build.add_argument("image_folder", help="Directory containing images to combine into a .gif")
     parser_build.add_argument("--out-file", default="./build.gif", help="Filename of the .gif to create")
     parser_build.add_argument("--duration", type=int, default=80, help="The amount of time (ms) for each frame")
-    parser_build.set_defaults(func=write_gif_from_frames)
+    parser_build.set_defaults(func=gif.write_gif_from_frames)
 
 @register("image", "stego", description="Image based steganography tools")
 def setup_image_stego(parser: argparse.ArgumentParser) -> None:
@@ -48,30 +43,30 @@ def setup_image_stego(parser: argparse.ArgumentParser) -> None:
     )
     initialize_parser.add_argument("file_path", help="Image file to convert to a container")
     initialize_parser.add_argument("-f", "--force", action="store_true", help="Force re-initialize existing containers")
-    initialize_parser.set_defaults(func=initialize)
+    initialize_parser.set_defaults(func=stego.initialize)
     
     validate_parser = subparsers.add_parser("validate", help="Validate the contents of a container")
     validate_parser.add_argument("file_path", help="Image file to validate")
     validate_parser.add_argument("--header-only", action="store_true", help="Only validate the contents of the header")
-    validate_parser.set_defaults(func=validate)
+    validate_parser.set_defaults(func=stego.validate)
     
     cat_parser = subparsers.add_parser("cat", help="Dump the contents of an image container")
     cat_parser.add_argument("file_path", help="Image file container to read")
     cat_parser.add_argument("-o", "--out-file", default="-", help="Output file to write contents to, default stdout")
-    cat_parser.set_defaults(func=cat)
+    cat_parser.set_defaults(func=stego.cat)
     
     write_parser = subparsers.add_parser("write", help="Write data into an existing container")
     write_parser.add_argument("file_path", help="Image file container to write to")
     write_parser.add_argument("--data", default="-", help="Data to write into the container, default reads from stdin")
-    write_parser.set_defaults(func=write)
+    write_parser.set_defaults(func=stego.write)
     
     format_parser = subparsers.add_parser("format", help="Format the pixel channel LSBs, deleting all written data")
     format_parser.add_argument("file_path", help="Image file container to format")
     format_group = format_parser.add_mutually_exclusive_group()
-    format_group.add_argument("--random", action="store_const", const=random_bytes(), dest="strategy", help="Format the data with random bytes")
-    format_group.add_argument("--zeros", action="store_const", const=fmt_zeros(), dest="strategy", help="Format the data with all 0s")
-    format_group.add_argument("--ones", action="store_const", const=fmt_ones(), dest="strategy", help="Format the data with all 1s")
-    format_parser.set_defaults(func=format, strategy=random_bytes())
+    format_group.add_argument("--random", action="store_const", const=stego.random_bytes(), dest="strategy", help="Format the data with random bytes")
+    format_group.add_argument("--zeros", action="store_const", const=stego.fmt_zeros(), dest="strategy", help="Format the data with all 0s")
+    format_group.add_argument("--ones", action="store_const", const=stego.fmt_ones(), dest="strategy", help="Format the data with all 1s")
+    format_parser.set_defaults(func=stego.format, strategy=stego.random_bytes())
     
     info_parser = subparsers.add_parser("info", help="Show container information")
     info_parser.add_argument("file_path", help="Image file container to inspect")
@@ -110,10 +105,10 @@ def setup_image_scramble(parser: argparse.ArgumentParser) -> None:
         "--show-meta",
         action="store_const",
         dest="func",
-        const=scramble_show_meta,
+        const=scramble.show_meta,
         help="Show metadata only and exit."
     )
-    parser.set_defaults(func=scramble_main)
+    parser.set_defaults(func=scramble.main)
     
     
 @register("image", "convert", description="Image conversions")
@@ -121,7 +116,7 @@ def setup_image_convert(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("filenames", nargs="+", help="Filenames to convert")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite if the new file exists")
     parser.add_argument("--overwrite-existing", action="store_true", help="Overwrite the existing file with the converted one")
-    for key, val in converters.items():
+    for key, val in convert.converters.items():
         parser.add_argument(
             f"--{key}",
             nargs="?",
@@ -130,15 +125,15 @@ def setup_image_convert(parser: argparse.ArgumentParser) -> None:
             const=val,
             help=val.__doc__,
         )
-    parser.set_defaults(func=convert_images, converters=[])
+    parser.set_defaults(func=convert.convert_images, converters=[])
     
     
-@register("image", "info", description="Show image information")
+@register("image", "find", description="Find image files in a directory")
 def setup_image_info(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("folder_path", help="Path to the folder containing images")
-    parser.add_argument("--sort", choices=["height", "width", "name", "size"], help="Sort the output table by this metric")
+    parser.add_argument("--sort", default="name", choices=["height", "width", "name", "size"], help="Sort the output table by this metric")
     parser.add_argument("--reverse", action="store_true", help="Reverse the sort order")
-    parser.set_defaults(func=show_info)
+    parser.set_defaults(func=info.show_info)
 
 
 
