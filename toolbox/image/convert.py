@@ -51,7 +51,7 @@ def exif_rotate(img: Image.Image, **kwargs):
             fixed_img = ImageOps.exif_transpose(img)
             return fixed_img
             
-        except Exception as e:
+        except Exception:
             return img
         
         

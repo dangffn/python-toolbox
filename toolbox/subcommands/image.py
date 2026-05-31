@@ -92,7 +92,7 @@ def setup_image_scramble(parser: argparse.ArgumentParser) -> None:
         help="Whether to unscramble instead of scramble",
     )
     parser.add_argument(
-        "--out-dir", default=None, help="The directory to save the resulting file to"
+        "--output-path", default=None, help="The directory to save the resulting file to"
     )
     parser.add_argument(
         "--out-format",
@@ -134,8 +134,6 @@ def setup_image_info(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--sort", default="name", choices=["height", "width", "name", "size"], help="Sort the output table by this metric")
     parser.add_argument("--reverse", action="store_true", help="Reverse the sort order")
     parser.set_defaults(func=info.show_info)
-
-
 
 
 class CustomImageViewer(ImageViewer):

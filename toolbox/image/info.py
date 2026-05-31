@@ -1,7 +1,7 @@
 from rich.table import Table
 import os
 from PIL import Image
-from typing import Tuple, TypeVar, Generator, TypedDict, Union, Literal, cast
+from typing import TypeVar, Generator, TypedDict, Literal, cast
 
 from toolbox.logger import console
 from toolbox.utils import bytes_str, walk_dir
@@ -33,10 +33,6 @@ def get_info(folder_path: str) -> Generator[Info, None, None]:
         except Exception:
             pass
         
-        
-def format(key: Literal["size", "width", "height"], val: int) -> str: ...
-
-def format(key: Literal["name"], val: str) -> str: ...
         
 def format(data: tuple[str, int | str]):
     key, val = data

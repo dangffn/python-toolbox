@@ -2,7 +2,6 @@
 
 from rich.table import Column
 from rich.table import Table
-from PIL.PngImagePlugin import PngInfo
 import hashlib
 import os
 from PIL import Image
@@ -131,7 +130,7 @@ def do_mod(pixel_array: np.ndarray, key: np.ndarray, do_scramble: bool=True):
 
 def get_metadata(image: Image.Image):
     # TODO: complete
-    metadata = PngInfo()
+    # metadata = PngInfo()
     
     if image.info:
         pass
@@ -180,7 +179,7 @@ def main(
             
             new_ext = "png" if out_format == "PNG" else "jpg"
             
-            output_path = Path(output_path) or p.parent
+            output_path = Path(output_path or p.parent)
             
             out_file, _ = os.path.splitext(str(output_path / Path(filename).name))
             out_file = Path(f"{out_file}.{new_ext}")
