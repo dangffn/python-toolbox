@@ -5,11 +5,10 @@ Main entrypoint to the 'toolbox' CLI tool.
 This project contains a collection of CLI based tools.
 """
 
-import argparse
 import sys
 from importlib import metadata
 
-from toolbox.subcommands.loader import init_subcommands
+from toolbox.subcommands import cli
 from toolbox.logger import console_err
 
 __version__ = metadata.version('dans-toolbox')
@@ -21,18 +20,18 @@ __email__ = "dangffn@gmail.com"
 def run(argv: list[str]):
     """Main entrypoint for the 'toolbox' CLI command.
     """
-    parser = argparse.ArgumentParser(prog="toolbox", description="A bunch of commands and stuff")
-    parser.add_argument(
-        "-v", "--version", action="version", version=f"%(prog)s {__version__}"
-    )
+    # parser = argparse.ArgumentParser(prog="toolbox", description="A bunch of commands and stuff")
+    # parser.add_argument(
+    #     "-v", "--version", action="version", version=f"%(prog)s {__version__}"
+    # )
 
-    # Initialize all configured subcommand handlers in the package.
-    init_subcommands(parser)
+    # # Initialize all configured subcommand handlers in the package.
+    # init_subcommands(parser)
 
-    args = parser.parse_args(argv)
+    args = cli.parser.parse_args(argv)
     func = args.__dict__.pop("func", None)
     if not func:
-        parser.print_help()
+        cli.parser.print_help()
         return 1
 
     try:

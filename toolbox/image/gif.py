@@ -4,8 +4,10 @@ from rich.progress import track
 
 from toolbox.logger import console
 from toolbox.utils import multi_file_arg, is_image, new_path_cleanup
+from toolbox.subcommands import cli
 
 
+@cli.register("image", "gif", "extract", positional="gif_file")
 def extract_images_from_gif(gif_file: Path | str, out_dir: Path | str="out"):
     """
     Extracts individual frames from a GIF and saves them as separate image files.
@@ -25,7 +27,8 @@ def extract_images_from_gif(gif_file: Path | str, out_dir: Path | str="out"):
                 
         console.log(f"Wrote [green]{im.n_frames:,}[/] images to [green]{out_dir}[/]")
     
-        
+    
+@cli.register("image", "gif", "build", positional="file_paths")
 def write_gif_from_frames(file_paths: list[Path | str], out_file: str, duration: int=100):
     """
     Creates an animated GIF from image frames in a specified folder.

@@ -96,7 +96,7 @@ def list_dir(path: Path | str):
             yield Path(file)
             
             
-def multi_file_arg(*path: Path | str):
+def multi_file_arg(*path: Path | str, recursive=False):
     """Specify multiple files, or a single directory.
     If a directory is specified, return all files inside.
     """
@@ -105,7 +105,10 @@ def multi_file_arg(*path: Path | str):
     if len(path) > 1:
         files = filter(lambda p: Path(p).is_file(), list(path))
     elif Path(path[0]).is_dir():
-        files = list_dir(path[0])
+        if recursive:
+            files = walk_dir(path[0])
+        else:
+            files = list_dir(path[0])
         
     files = list(map(Path, files))
     assert len(files) > 0, "Specify multiple files or a single directory"

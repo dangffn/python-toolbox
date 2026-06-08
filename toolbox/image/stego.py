@@ -30,6 +30,7 @@ from rich.emoji import Emoji
 from toolbox.logger import console
 from toolbox.utils.binary import get_mask, split
 from toolbox.utils import bytes_str, pipe_bytes, find
+from toolbox.subcommands import cli
 
 
 Pos = Tuple[int, int, int]
@@ -37,14 +38,17 @@ Oper = Tuple[Pos, Pos, int, str]
 Strategy = Iterator[bytes]
 
 
-def random_bytes() -> Iterator[bytes]:
+@cli.register_arg_const("image", "stego", "format", dest="strategy", action="store_const")
+def fmt_random() -> Iterator[bytes]:
     while True:
         yield randbytes(1)
 
+@cli.register_arg_const("image", "stego", "format", dest="strategy", action="store_const")
 def fmt_zeros() -> Iterator[bytes]:
     while True:
         yield np.uint8(0).tobytes()
 
+@cli.register_arg_const("image", "stego", "format", dest="strategy", action="store_const")
 def fmt_ones() -> Iterator[bytes]:
     while True:
         yield np.uint8(0xFF).tobytes()
@@ -396,31 +400,37 @@ class Container(io.RawIOBase):
         self.header.count = 0
 
 
-def cat(file_path: str, out_file: str) -> None:
+@cli.register("image", "stego", "cat", positional="file_path")
+def cat(file_path: str, out_file: str="-") -> None:
     with Container.open(file_path) as c:
         pipe_bytes(c, out_file)
 
 
-def write(file_path: str, data: str) -> None:
+@cli.register("image", "stego", "write", positional="file_path")
+def write(file_path: str, data: str="-") -> None:
     with Container.open(file_path) as c:
         pipe_bytes(data, c)
 
 
-def initialize(file_path: str, force: bool) -> None:
+@cli.register("image", "stego", "initialize", positional="file_path")
+def initialize(file_path: str, force: bool=False) -> None:
     with Container.open(file_path, initialize=True, force=force):
         pass
 
 
-def validate(file_path: str, header_only: bool) -> None:
+@cli.register("image", "stego", "validate", positional="file_path")
+def validate(file_path: str, header_only: bool=False) -> None:
     with Container.open(file_path) as c:
         c.validate(header_only)
 
 
-def format(file_path: str, strategy: Strategy) -> None:
+@cli.register("image", "stego", "format", positional="file_path", ignores=["strategy"])
+def format(file_path: str, strategy: Callable[[], Iterator[bytes]]) -> None:
     with Container.open(file_path) as c:
-        c.format(strategy)
+        c.format(strategy())
 
 
+@cli.register("image", "stego", "info", positional="file_path")
 def info(file_path: str) -> None:
     with Container.open(file_path) as c:
         table = Table(

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from typing import Literal
 from PIL import Image, ImageOps, ImageChops
 import numpy as np
 import os
@@ -7,11 +8,33 @@ import os
 from typing import Callable, List, Any
 
 from toolbox.logger import console
+from toolbox.subcommands import cli
+from toolbox.utils import multi_file_arg
 
 
 WHITE = (255, 255, 255)
+Channel = Literal["R", "G", "B", "A"]
 
 
+@cli.register_arg_const("image", "convert", dest="converters", ignores=["img", "kwargs"])
+def mod_channel(img: Image.Image, channel: Channel, modifier: float, **kwargs):
+    """Apply a multiplier modifier to the specified channel.
+    
+    Args:
+        channel (str): One of R, G, B, A
+        modifier (float): Normalized float to modify a channel value
+    """
+    assert channel is not None, "Channel is required"
+    assert modifier is not None, "Modifier is required"
+    assert 0 <= modifier <= 1, "Modifier must be between 0 and 1"
+    
+    rgba_img = img.convert("RGBA")
+    data = dict(zip("RGBA", rgba_img.split()))
+    data[channel] = data[channel].point(lambda p: min(255, max(0, int(p * modifier))))
+    return Image.merge("RGBA", (data["R"], data["G"], data["B"], data["A"]))
+
+
+@cli.register_arg_const("image", "convert", dest="converters", ignores=["img", "kwargs"])
 def rgba_white_alpha(img: Image.Image, **kwargs):
     """Convert an RGBA to B&W, changing white pixels to transparent."""
     alpha = np.array(img.convert("L"))
@@ -19,6 +42,8 @@ def rgba_white_alpha(img: Image.Image, **kwargs):
     out_array[:, :, 3] = alpha
     return Image.fromarray(out_array)
 
+
+@cli.register_arg_const("image", "convert", dest="converters", ignores=["img", "kwargs"])
 def resize_and_pad(img: Image.Image, **kwargs):
     """Resize the image to the specified dimensions, padding with the specified color."""
     size = (1024, 1024)
@@ -41,6 +66,8 @@ def resize_and_pad(img: Image.Image, **kwargs):
         new_img.paste(img, upper_left)
         return new_img
     
+    
+@cli.register_arg_const("image", "convert", dest="converters", ignores=["img", "kwargs"])
 def exif_rotate(img: Image.Image, **kwargs):
     """
     Reads an image, rotates it according to EXIF data so it appears upright,
@@ -55,6 +82,7 @@ def exif_rotate(img: Image.Image, **kwargs):
             return img
         
         
+@cli.register_arg_const("image", "convert", dest="converters", ignores=["img", "kwargs"])
 def crop_white(img: Image.Image, **kwargs):
     """Removes white borders from an image."""
     
@@ -84,17 +112,29 @@ def crop_white(img: Image.Image, **kwargs):
         # If the image is entirely white, return the original or a 1x1 pixel
         return img
     
-
-def convert_images(filenames, converters: List[Callable[[Image.Image], Image.Image]], overwrite_existing: bool=False, overwrite: bool=False, **kwargs: Any):
-    suffix = "_converted"
-    filenames = filter(lambda f: not os.path.splitext(f)[0].endswith(suffix), filenames)
     
-    for filename in filenames:
+@cli.register("image", "convert", ignores=["converters", "kwargs"], positional="paths")
+def convert_images(paths: list[str], converters: list[Callable[[Image.Image], Image.Image]], overwrite_existing: bool=False, overwrite: bool=False, recursive: bool=False, **kwargs):
+    """Convert images with a list of converter methods.
+    Args:
+        paths (list[str]): Filenames or a folder to run conversions on
+        converters (list[Callable]): Conversion functions to run on the images
+        overwrite_existing (bool, optional): Overwrite existing files. Defaults to false.
+        overwrite (bool, optional): Overwrite files if they already exist. Defaults to false.
+        recursive (bool, optional): Recursively search the path if a directory is specified
+    """
+    suffix = "_converted"
+    for filename in multi_file_arg(*paths, recursive=recursive):
+        name, ext = os.path.splitext(filename.name)
+        if name.endswith(suffix):
+            console.log(f"Skipping {filename}")
+            continue
+        
         img = Image.open(filename)
         for converter in converters:
-            img = converter(img)
+            img = converter(img, **kwargs)
         if img:
-            *pre, ext = filename.split(".")
+            *pre, ext = filename.name.split(".")
             
             if overwrite_existing:
                 out_file = filename
@@ -113,4 +153,5 @@ converters = dict(
     resize_and_pad=resize_and_pad,
     exif_rotate=exif_rotate,
     crop_white=crop_white,
+    mod_channel=mod_channel,
 )
