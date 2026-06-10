@@ -28,6 +28,7 @@ dependencies = [
     "moviepy==2.2.1",
     "paramiko==4.0.0",
     "docstring-parser>=0.18.0",
+    "opencv-python>=4.13.0.92",
 ]
 
 [dependency-groups]

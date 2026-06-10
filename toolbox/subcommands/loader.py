@@ -85,7 +85,10 @@ class Cli:
                 kwargs["dest"] = name
                 name = f'--{name.replace("_", "-")}'
                 
-            parser.add_argument(name, **kwargs)
+            try:
+                parser.add_argument(name, **kwargs)
+            except argparse.ArgumentError:
+                pass
     
     def register_arg_const(self, *subcommand: str, dest: str | None=None, ignores: list[str] | None=None, action: str="append_const"):
         def wrapper(func: T) -> T:

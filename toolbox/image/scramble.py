@@ -5,8 +5,9 @@ import hashlib
 import os
 from PIL import Image
 import numpy as np
+import cv2
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Callable
 
 from toolbox.logger import console
 from toolbox.utils import is_image, multi_file_arg, new_path_cleanup
@@ -153,6 +154,32 @@ def show_meta(file_paths: list[str], **kwargs):
             console.print(table)
         else:
             console.log(f"{filename} has no metadata")
+            
+            
+def is_scrambled(path: Path | str):
+    img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+    if img is None:
+        return False, -1.0
+    
+    diff_h = np.abs(img[:, :-1].astype(np.int16) - img[:, 1:].astype(np.int16))
+    diff_v = np.abs(img[:-1, :].astype(np.int16) - img[1:, :].astype(np.int16))
+    mean_diff = (np.mean(diff_h) + np.mean(diff_v))
+    scrambled = (mean_diff > 50.0).all()
+    
+    # console.log(f"Mean difference: {mean_diff} for {path} scrambled={scrambled}")
+    
+    return scrambled, mean_diff
+
+            
+def check_scrambled(file_paths: list[Path]):
+    table = Table("Path", "Scrambled", border_style="#444444")
+    
+    for img in list(filter(is_image, multi_file_arg(*file_paths))):
+        scrambled, diff = is_scrambled(img)
+        clr = "yellow" if scrambled else "green"
+        table.add_row(str(img), f"[{clr}]{'scrambled' if scrambled else 'normal'}[/]", f"diff {diff:.2f}")
+        
+    console.print(table)
 
 
 @cli.register("image", "scramble", positional="file_paths")
@@ -164,6 +191,8 @@ def scramble(
     out_format: Literal["PNG", "JPEG"]="PNG",
     recursive: bool=False,
     remove_existing: bool=False,
+    check_only: bool=False,
+    multi: bool=False,
 ) -> None:
     """Pixel scramble images at the specified paths.
     
@@ -180,12 +209,25 @@ def scramble(
     
     assert image_paths, "No images found"
     
+    if check_only:
+        check_scrambled(image_paths)
+        return
+    
     key = ScrambleKey(password or b"").array
     op = "Scrambling" if not unscramble else "Unscrambling"
     new_ext = "jpg" if out_format == "JPEG" else "png"
     
     with console.status(op) as status:
         for p in image_paths:
+            scrambled, _ = is_scrambled(p)
+            if not multi:
+                if scrambled and not unscramble:
+                    console.log(f"Skipping {p}")
+                    continue
+                if not scrambled and unscramble:
+                    console.log(f"Skipping {p}")
+                    continue
+            
             status.update(f"{op} [green]{p}[/green]")
             
             initial_arr = load_image(p)
