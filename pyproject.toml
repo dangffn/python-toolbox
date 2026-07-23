@@ -29,6 +29,7 @@ dependencies = [
     "paramiko==4.0.0",
     "docstring-parser>=0.18.0",
     "opencv-python>=4.13.0.92",
+    "pillow-heif>=1.4.0",
 ]
 
 [dependency-groups]

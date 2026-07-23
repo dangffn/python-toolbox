@@ -60,7 +60,7 @@ class Cli:
             except AttributeError:
                 type_str = "str"
             
-            kwargs = {
+            kwargs: dict[str, str | bool | type | None] = {
                 "help": self._get_param_help(func, name)
             }
             

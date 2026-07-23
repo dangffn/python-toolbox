@@ -6,9 +6,13 @@ import io
 from pathlib import Path
 from contextlib import contextmanager
 from hashlib import sha256
+from pillow_heif import register_heif_opener
 import sys
 import os
 
+
+# Enables opening of .heif images.
+register_heif_opener()
 
 Writable = io.RawIOBase | Path | str | Literal["-"]
 Readable = Writable | bytes
