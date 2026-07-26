@@ -7,7 +7,7 @@ from PIL import Image
 import numpy as np
 import cv2
 from pathlib import Path
-from typing import Literal, Callable
+from typing import Literal
 
 from toolbox.logger import console
 from toolbox.utils import is_image, multi_file_arg, new_path_cleanup
@@ -139,19 +139,26 @@ def get_metadata(image: Image.Image):
         pass
     
 
-def show_meta(file_paths: list[str], **kwargs):
-    for filename in file_paths:
+@cli.register("image", "metadata", positional="file_paths", ignores=["kwargs"])
+def show_meta(file_paths: list[str], text_only: bool=False, **kwargs):
+    image_paths = list(filter(is_image, multi_file_arg(*file_paths)))
+    for filename in image_paths:
         image = Image.open(filename)
-        if image.info:
+        if image.info and len(image.info.items()) > 0:
             table = Table(
                 Column("Key", style="white"),
                 Column("Value", style="cyan", width=50),
                 border_style="#444444",
             )
             for key, val in image.info.items():
-                table.add_column(str(key), str(val))
-                
-            console.print(table)
+                if text_only:
+                    print(key)
+                    print(val)
+                    
+                table.add_row(str(key), str(val))
+
+            if not text_only:                
+                console.print(table)
         else:
             console.log(f"{filename} has no metadata")
             
