@@ -192,12 +192,3 @@ def convert_images(paths: list[str], converters: list[Callable[[Image.Image], Im
                     img.save(out_file)
                 else:
                     console.log(f"{out_file} already exists", style="red")
-            
-        
-converters = dict(
-    rgba_white_alpha=rgba_white_alpha,
-    resize_and_pad=resize_and_pad,
-    exif_rotate=exif_rotate,
-    crop_white=crop_white,
-    mod_channel=mod_channel,
-)
