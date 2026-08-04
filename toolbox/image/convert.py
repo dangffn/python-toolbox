@@ -5,7 +5,6 @@ from typing import Literal
 from PIL import Image, ImageOps, ImageChops
 import numpy as np
 import os
-from rich.progress import track
 
 from typing import Callable
 
