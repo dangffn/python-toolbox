@@ -1,69 +1,116 @@
 """Register CLI subcommands on script startup."""
-from typing import Callable, Dict, List, Optional, TypeVar, TypedDict
-from collections import defaultdict
 import argparse
+from typing import Callable, TypeVar
+import docstring_parser
+import inspect
 
-Func = Callable[[argparse.ArgumentParser], None]
-
-Registered = TypedDict("Registered", {
-    "func": Func,
-    "children": Dict[str, "Registered"],
-})
-
-T = TypeVar("T", bound=Func)
+from toolbox.utils import find
 
 
-def get_default() -> Registered:
-    return { "func": lambda x: None, "children": defaultdict(get_default) }
+T = TypeVar("T", bound=Callable)
+Func = Callable[[T], T]
 
 
-registered: Dict[str, Registered] = defaultdict(get_default)
-
-
-def register(*subcommand: str, description: Optional[str]=None) -> Callable[[T], T]:
-    """Decorates a subcommand handler method. Decorated methods will be loaded on startup and
-    registered to the appropriate CLI 'subcommand' in the argparse subparsers.
-
-    Args:
-        subcommand (str): CLI subcommand to register the method to
-        description (Optional[str], optional): Optional description used in '--help'. Defaults to
-        None.
-
-    Returns:
-        Callable[[T], T]: decorated method used as the CLI subcommand handler.
-    """
-    def wrapper(func: T) -> T:
-        setattr(func, "_description", description)
+class Cli:
+    def __init__(self, parser: argparse.ArgumentParser):
+        self.parser = parser
         
-        path: List[str] = list(subcommand)
-        cmd = path[0]
-        reg: Dict[str, Registered] = registered
+    def _init_parser(self, subcommand: tuple[str, ...], description: str | None=None) -> argparse.ArgumentParser:
+        path = list(subcommand)
+        parser = self.parser
+        key = tuple()
         
-        while len(path) > 1:
-            reg = reg[path.pop(0)]["children"]
-            cmd = path[0]
+        while path:
+            cmd = path.pop(0)
+            key += (cmd,)
             
-        reg[cmd]["func"] = func
-        return func
-    return wrapper
+            subp = find(parser._actions, lambda a: isinstance(a, argparse._SubParsersAction))
+            subp: argparse._SubParsersAction = subp or parser.add_subparsers(description="Subcommands")
 
-
-def init_subcommands(parser: argparse.ArgumentParser, reg: Optional[Dict[str, Registered]] = None) -> None:
-    """Initialize all of the registered subcommand handlers. Inserting them into the main argparse
-    argument parser config.
-
-    Args:
-        parser (argparse.ArgumentParser): argument parser instance to register subcommands
-    """
-    if reg is None:
-        reg = registered
+            if not path:
+                parser = subp._name_parser_map.get(cmd) or subp.add_parser(cmd, description=description, help=description)
+            else:
+                parser = subp._name_parser_map.get(cmd) or subp.add_parser(cmd)
+            
+        return parser
+    
+    def _get_param_help(self, func: Callable, parameter: str):
+        help = ""
+        parsed_doc = docstring_parser.parse(func.__doc__)
+        for param in parsed_doc.params:
+            if param.arg_name == parameter:
+                help = param.description
+                break
+        return help
+    
+    def _get_func_help(self, func: Callable):
+        parsed_doc = docstring_parser.parse(func.__doc__)
+        return parsed_doc.short_description
+    
+    def _add_args_from_func(self, parser: argparse.ArgumentParser, func: Callable, ignores: list[str] | None=None, positional: str | None=None):
+        arguments = inspect.signature(func)
+        for name, param in arguments.parameters.items():
+            if ignores and name in ignores:
+                continue
+            
+            type_ = param.annotation
+            try:
+                type_str = type_.__name__
+            except AttributeError:
+                type_str = "str"
+            
+            kwargs: dict[str, str | bool | type | None] = {
+                "help": self._get_param_help(func, name)
+            }
+            
+            is_positional = positional and name == positional
+            
+            if param.default is not inspect.Parameter.empty:
+                kwargs["default"] = param.default
+            else:
+                if not is_positional:
+                    kwargs["required"] = True
+            
+            if type_str == "list":
+                kwargs["nargs"] = "+"
+            elif type_str == "bool":
+                kwargs["action"] = "store_true"
+            elif type_str == "Literal" or type_str == "str":
+                kwargs["type"] = str
+            else:
+                kwargs["type"] = type_
+                
+            if not is_positional:
+                kwargs["dest"] = name
+                name = f'--{name.replace("_", "-")}'
+                
+            try:
+                parser.add_argument(name, **kwargs)
+            except argparse.ArgumentError:
+                pass
+    
+    def register_arg_const(self, *subcommand: str, dest: str | None=None, ignores: list[str] | None=None, action: str="append_const"):
+        def wrapper(func: T) -> T:
+            arg_name = func.__name__.replace("_", "-")
+            
+            parser = self._init_parser(subcommand, self._get_func_help(func))
+            parser.add_argument(f"--{arg_name}", dest=dest, action=action, const=func, help=self._get_func_help(func))
+            parser.set_defaults(**{ dest: [] })
+            self._add_args_from_func(parser, func, ignores)
+            return func
         
-    if not reg:
-        return
-    
-    subparsers = parser.add_subparsers()
-    
-    for subcommand, child in reg.items():
-        sub_subparsers = subparsers.add_parser(subcommand, help=getattr(child["func"], "_description", None))
-        child["func"](sub_subparsers)
-        init_subcommands(sub_subparsers, child["children"])
+        return wrapper
+        
+    def register(self, *subcommand: str, ignores: list[str] | None=None, positional: str | None=None) -> Callable[[T], T]:
+        def wrapper(func: T) -> T:
+            parser = self._init_parser(subcommand, self._get_func_help(func))
+            parser.set_defaults(func=func)
+            self._add_args_from_func(parser, func, ignores, positional)
+
+            return func
+            
+        return wrapper
+        
+
+parser = argparse.ArgumentParser(description="Dan's Toolbox")
+cli = Cli(parser)

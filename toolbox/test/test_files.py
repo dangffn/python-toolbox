@@ -1,6 +1,4 @@
-import pytest
 from pathlib import Path
-import tempfile
 import os
 
 
@@ -9,13 +7,6 @@ from toolbox.utils import pipe_bytes, read_bytes, new_path_cleanup
 
 class Ok(Exception):
     pass
-    
-
-@pytest.fixture
-def test_files(cleanup_dir):
-    _, f1 = tempfile.mkstemp(prefix=f"{cleanup_dir}/test-file")
-    _, f2 = tempfile.mkstemp(prefix=f"{cleanup_dir}/test-file")
-    yield f1, f2
     
     
 def test_deleted_on_err(cleanup_dir):

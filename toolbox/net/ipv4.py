@@ -1,14 +1,19 @@
 """IPv4 tools."""
 
 from functools import reduce
-from typing import Any, Dict, Optional, Union, List, cast
+from typing import Any, Dict, Optional, Union, List, Literal, cast
 import re
+import json
 import numpy as np
+from rich.table import Column, Table
 
-from toolbox.utils.binary import get_mask
+from toolbox.utils import get_mask
+from toolbox.logger import console
+from toolbox.subcommands import cli
 
 
 AddressLike = Union[int, str, np.uint32, "Address"]
+
 
 private_subnets = [
     "10.0.0.0/8",
@@ -141,3 +146,29 @@ class Config:
             "last_usable": str(self.last_usable),
             "private": self.address.is_private,
         }
+
+
+@cli.register("net", "ipv4", positional="ip_address")
+def show_ip(ip_address: str, output: Literal["print", "json"]="print") -> None:
+    """Show IPv4 address information.
+    
+    Args:
+        ip_address (str): IP address with CIDR
+        output (str): The output format (print | json)
+    """
+    data = Config(ip_address).to_json()
+    if output == "print":
+        table = Table(
+            Column("Key", style="#444444"),
+            Column("Value", style="cyan"),
+            border_style="#444444"
+        )
+        for key, val in data.items():
+            key = " ".join(key.capitalize().split("_"))
+            if isinstance(val, int):
+                table.add_row(key, f"{val:,}")
+            else:
+                table.add_row(key, val)
+        console.print(table)
+    else:
+        print(json.dumps(data, indent=4))

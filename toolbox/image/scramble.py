@@ -5,11 +5,13 @@ import hashlib
 import os
 from PIL import Image
 import numpy as np
+import cv2
 from pathlib import Path
 from typing import Literal
 
 from toolbox.logger import console
 from toolbox.utils import is_image, multi_file_arg, new_path_cleanup
+from toolbox.subcommands import cli
 
 
 Pixels = np.ndarray[tuple[int, ...]]
@@ -137,46 +139,112 @@ def get_metadata(image: Image.Image):
         pass
     
 
-def show_meta(file_paths: list[str], **kwargs):
-    for filename in file_paths:
+@cli.register("image", "metadata", positional="file_paths", ignores=["kwargs"])
+def show_meta(file_paths: list[str], text_only: bool=False, **kwargs):
+    image_paths = list(filter(is_image, multi_file_arg(*file_paths)))
+    for filename in image_paths:
         image = Image.open(filename)
-        if image.info:
+        if image.info and len(image.info.items()) > 0:
             table = Table(
                 Column("Key", style="white"),
                 Column("Value", style="cyan", width=50),
                 border_style="#444444",
             )
             for key, val in image.info.items():
-                table.add_column(str(key), str(val))
-                
-            console.print(table)
+                if text_only:
+                    print(key)
+                    print(val)
+                    
+                table.add_row(str(key), str(val))
+
+            if not text_only:                
+                console.print(table)
         else:
             console.log(f"{filename} has no metadata")
+            
+            
+def is_scrambled(path: Path | str):
+    img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+    if img is None:
+        return False, -1.0
+    
+    diff_h = np.abs(img[:, :-1].astype(np.int16) - img[:, 1:].astype(np.int16))
+    diff_v = np.abs(img[:-1, :].astype(np.int16) - img[1:, :].astype(np.int16))
+    mean_diff = (np.mean(diff_h) + np.mean(diff_v))
+    scrambled = (mean_diff > 50.0).all()
+    
+    # console.log(f"Mean difference: {mean_diff} for {path} scrambled={scrambled}")
+    
+    return scrambled, mean_diff
+
+            
+def check_scrambled(file_paths: list[Path]):
+    table = Table("Path", "Scrambled", border_style="#444444")
+    
+    for img in list(filter(is_image, multi_file_arg(*file_paths))):
+        scrambled, diff = is_scrambled(img)
+        clr = "yellow" if scrambled else "green"
+        table.add_row(str(img), f"[{clr}]{'scrambled' if scrambled else 'normal'}[/]", f"diff {diff:.2f}")
+        
+    console.print(table)
 
 
-def main(
-    password: str,
+@cli.register("image", "scramble", positional="file_paths")
+def scramble(
     file_paths: list[Path | str],
-    do_scramble: bool,
+    unscramble: bool=False,
+    password: str="",
     out_dir: Path | str | None=None,
     out_format: Literal["PNG", "JPEG"]="PNG",
+    recursive: bool=False,
+    remove_existing: bool=False,
+    check_only: bool=False,
+    multi: bool=False,
 ) -> None:
-    image_paths = list(filter(is_image, multi_file_arg(*file_paths)))
+    """Pixel scramble images at the specified paths.
+    
+    Args:
+        file_paths (list[str]): Paths to image files, or a folder containing image files
+        password (str): Password to use for scrambling
+        unscramble (bool): If specified, unscramble the image(s)
+        out_dir (str): Output directory to save the images to
+        out_format (str): Output format to use (PNG or JPEG), it is recommended to use PNG, as storing scrambled images in JPEG will result in severe compression artifacts
+        recursive (bool): Recursively search the path if a directory is specified
+        remove_existing (bool): If specified, existing files will be removed once scrambled
+    """
+    image_paths = list(filter(is_image, multi_file_arg(*file_paths, recursive=recursive)))
     
     assert image_paths, "No images found"
     
+    if check_only:
+        check_scrambled(image_paths)
+        return
+    
     key = ScrambleKey(password or b"").array
-    op = "Scrambling" if do_scramble else "Unscrambling"
-    new_ext = "png" if out_format == "PNG" else "jpg"
+    op = "Scrambling" if not unscramble else "Unscrambling"
+    new_ext = "jpg" if out_format == "JPEG" else "png"
     
     with console.status(op) as status:
         for p in image_paths:
+            scrambled, _ = is_scrambled(p)
+            if not multi:
+                if scrambled and not unscramble:
+                    console.log(f"Skipping {p}")
+                    continue
+                if not scrambled and unscramble:
+                    console.log(f"Skipping {p}")
+                    continue
+            
             status.update(f"{op} [green]{p}[/green]")
             
             initial_arr = load_image(p)
-            scrambled_arr = do_mod(initial_arr, key, do_scramble=do_scramble)
+            scrambled_arr = do_mod(initial_arr, key, do_scramble=not unscramble)
 
-            out_dir = Path(out_dir or p.parent)
-            with new_path_cleanup(out_dir, is_file=False):
+            out_dir_ = Path(out_dir or p.parent)
+            with new_path_cleanup(out_dir_, is_file=False):
                 out_name = os.path.splitext(p.name)[0] + f".{new_ext}"
-                save_image(scrambled_arr, out_dir / out_name, fmt=out_format)
+                new_path = Path(out_dir_ / out_name)
+                save_image(scrambled_arr, new_path, fmt=out_format)
+                
+                if remove_existing and p != new_path:
+                    p.unlink()
