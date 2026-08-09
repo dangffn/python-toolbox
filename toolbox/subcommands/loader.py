@@ -1,53 +1,64 @@
 """Register CLI subcommands on script startup."""
 import argparse
-from typing import Callable, TypeVar
 import docstring_parser
 import inspect
+from typing import Callable, TypeVar, Hashable, Generic, Any
 
 from toolbox.utils import find
 
 
 T = TypeVar("T", bound=Callable)
+P = TypeVar("P", bound=argparse.ArgumentParser)
 Func = Callable[[T], T]
 
-
-class Cli:
-    def __init__(self, parser: argparse.ArgumentParser):
+class Cli(Generic[P]):
+    def __init__(self, parser: P):
         self.parser = parser
         
-    def _init_parser(self, subcommand: tuple[str, ...], description: str | None=None) -> argparse.ArgumentParser:
-        path = list(subcommand)
-        parser = self.parser
-        key = tuple()
+    def _init_parser(self, subcommand: tuple[str, ...], description: str | None=None) -> P:
+        path: list[str] = list(subcommand)
+        parser: P = self.parser
+        key: tuple[Hashable, ...] = tuple()
         
         while path:
-            cmd = path.pop(0)
+            cmd: str = path.pop(0)
             key += (cmd,)
             
-            subp = find(parser._actions, lambda a: isinstance(a, argparse._SubParsersAction))
-            subp: argparse._SubParsersAction = subp or parser.add_subparsers(description="Subcommands")
+            # find() can return None, but add_subparsers() returns a _SubParsersAction, so subparsers is never None.
+            subp_action = find(parser._actions, lambda a: isinstance(a, argparse._SubParsersAction))
+            subparsers = subp_action or parser.add_subparsers(description="Subcommands")
 
-            if not path:
-                parser = subp._name_parser_map.get(cmd) or subp.add_parser(cmd, description=description, help=description)
+            assert isinstance(subparsers, argparse._SubParsersAction), f"Invalid subcommand [{' '.join(map(str, key))}] of type [{type(subparsers)}]"
+                
+            existing_parser = subparsers._name_parser_map.get(cmd)
+            if existing_parser:
+                parser = existing_parser
             else:
-                parser = subp._name_parser_map.get(cmd) or subp.add_parser(cmd)
+                parser = subparsers.add_parser(cmd, help=description, description=description)
+                
+            # Set the parser description if it was not previously set.
+            if not path and description:
+                parser.description = description
+                choice_action = find(subparsers._choices_actions, lambda a: a.dest == cmd)
+                if choice_action:
+                    choice_action.help = description
             
         return parser
     
-    def _get_param_help(self, func: Callable, parameter: str):
+    def _get_param_help(self, func: Callable[..., Any], parameter: str) -> str | None:
         help = ""
-        parsed_doc = docstring_parser.parse(func.__doc__)
+        parsed_doc = docstring_parser.parse(func.__doc__ or "")
         for param in parsed_doc.params:
             if param.arg_name == parameter:
                 help = param.description
                 break
-        return help
+        return help or None
     
-    def _get_func_help(self, func: Callable):
-        parsed_doc = docstring_parser.parse(func.__doc__)
+    def _get_func_help(self, func: Callable[..., Any]) -> str | None:
+        parsed_doc = docstring_parser.parse(func.__doc__ or "")
         return parsed_doc.short_description
     
-    def _add_args_from_func(self, parser: argparse.ArgumentParser, func: Callable, ignores: list[str] | None=None, positional: str | None=None):
+    def _add_args_from_func(self, parser: argparse.ArgumentParser, func: Callable[..., Any], ignores: list[str] | None=None, positional: str | None=None):
         arguments = inspect.signature(func)
         for name, param in arguments.parameters.items():
             if ignores and name in ignores:
@@ -59,7 +70,7 @@ class Cli:
             except AttributeError:
                 type_str = "str"
             
-            kwargs: dict[str, str | bool | type | None] = {
+            kwargs: dict[str, Any] = {
                 "help": self._get_param_help(func, name)
             }
             
@@ -95,7 +106,8 @@ class Cli:
             
             parser = self._init_parser(subcommand, self._get_func_help(func))
             parser.add_argument(f"--{arg_name}", dest=dest, action=action, const=func, help=self._get_func_help(func))
-            parser.set_defaults(**{ dest: [] })
+            defaults = { dest: [] } if dest else {}
+            parser.set_defaults(**defaults)
             self._add_args_from_func(parser, func, ignores)
             return func
         
@@ -109,6 +121,12 @@ class Cli:
 
             return func
             
+        return wrapper
+    
+    def register_help(self, *subcommand):
+        def wrapper(help: str):
+            parser = self._init_parser(subcommand, help)
+            parser.set_defaults(func=lambda: parser.print_usage())
         return wrapper
         
 

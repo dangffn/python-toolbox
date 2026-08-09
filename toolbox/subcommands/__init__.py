@@ -1,1 +1,1 @@
-from toolbox.subcommands.loader import cli  # noqa
+from toolbox.subcommands.loader import cli, parser  # noqa

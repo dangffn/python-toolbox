@@ -8,6 +8,7 @@ import numpy as np
 import cv2
 from pathlib import Path
 from typing import Literal
+import json as json_
 
 from toolbox.logger import console
 from toolbox.utils import is_image, multi_file_arg, new_path_cleanup
@@ -18,6 +19,12 @@ Pixels = np.ndarray[tuple[int, ...]]
 Indices = np.ndarray[tuple[int, ...]]
 
 META_KEY = "pixel-scramble"
+
+# Mean diff threshold to determine when an image is scrambled.
+DIFF_THRESHOLD = 50.0
+
+# Output formats supported.
+OUT_FORMATS = ["PNG", "JPEG"]
 
 
 class ScrambleKey:
@@ -131,34 +138,31 @@ def do_mod(pixel_array: np.ndarray, key: np.ndarray, do_scramble: bool=True):
     return pixel_array
 
 
-def get_metadata(image: Image.Image):
-    # TODO: complete
-    # metadata = PngInfo()
-    
-    if image.info:
-        pass
-    
-
 @cli.register("image", "metadata", positional="file_paths", ignores=["kwargs"])
-def show_meta(file_paths: list[str], text_only: bool=False, **kwargs):
+def show_meta(file_paths: list[str], json: bool=False, **kwargs):
+    """Show image metadata.
+
+    Args:
+        file_paths (list[str]): a list of files to read metadata from
+        json (bool, optional): output JSON formatted data, default: false
+    """
     image_paths = list(filter(is_image, multi_file_arg(*file_paths)))
     for filename in image_paths:
         image = Image.open(filename)
+        if json:
+            print(json_.dumps(image.info))
+            continue
+        
         if image.info and len(image.info.items()) > 0:
             table = Table(
                 Column("Key", style="white"),
                 Column("Value", style="cyan", width=50),
+                title=f"[cyan]Metadata[/] for [green]{filename}[/]",
                 border_style="#444444",
             )
             for key, val in image.info.items():
-                if text_only:
-                    print(key)
-                    print(val)
-                    
                 table.add_row(str(key), str(val))
-
-            if not text_only:                
-                console.print(table)
+            console.print(table)
         else:
             console.log(f"{filename} has no metadata")
             
@@ -171,7 +175,7 @@ def is_scrambled(path: Path | str):
     diff_h = np.abs(img[:, :-1].astype(np.int16) - img[:, 1:].astype(np.int16))
     diff_v = np.abs(img[:-1, :].astype(np.int16) - img[1:, :].astype(np.int16))
     mean_diff = (np.mean(diff_h) + np.mean(diff_v))
-    scrambled = (mean_diff > 50.0).all()
+    scrambled = (mean_diff > DIFF_THRESHOLD).all()
     
     # console.log(f"Mean difference: {mean_diff} for {path} scrambled={scrambled}")
     
@@ -179,12 +183,12 @@ def is_scrambled(path: Path | str):
 
             
 def check_scrambled(file_paths: list[Path]):
-    table = Table("Path", "Scrambled", border_style="#444444")
+    table = Table("Path", "Scrambled", "Mean Diff", border_style="#444444")
     
     for img in list(filter(is_image, multi_file_arg(*file_paths))):
         scrambled, diff = is_scrambled(img)
-        clr = "yellow" if scrambled else "green"
-        table.add_row(str(img), f"[{clr}]{'scrambled' if scrambled else 'normal'}[/]", f"diff {diff:.2f}")
+        clr = "green" if scrambled else "#444444"
+        table.add_row(str(img), f"[{clr}]{'scrambled' if scrambled else 'not scrambled'}[/]", f"{diff:.2f} / {DIFF_THRESHOLD:.2f}")
         
     console.print(table)
 
@@ -201,17 +205,21 @@ def scramble(
     check_only: bool=False,
     multi: bool=False,
 ) -> None:
-    """Pixel scramble images at the specified paths.
+    """Scramble the pixels of an image with a password.
     
     Args:
         file_paths (list[str]): Paths to image files, or a folder containing image files
-        password (str): Password to use for scrambling
-        unscramble (bool): If specified, unscramble the image(s)
-        out_dir (str): Output directory to save the images to
-        out_format (str): Output format to use (PNG or JPEG), it is recommended to use PNG, as storing scrambled images in JPEG will result in severe compression artifacts
-        recursive (bool): Recursively search the path if a directory is specified
-        remove_existing (bool): If specified, existing files will be removed once scrambled
+        password (str): Password to use for scrambling, default: ""
+        unscramble (bool): If specified, unscramble the image(s), default: false
+        out_dir (str): Output directory to save the images to, default: (current directory)
+        out_format (str): Output format to use (PNG or JPEG), it is recommended to use PNG, as storing scrambled images in JPEG will result in severe compression artifacts, default: PNG
+        recursive (bool): Recursively search the path if a directory is specified, default: false
+        remove_existing (bool): If specified, existing files will be removed once scrambled, default: false
+        check_only (bool): If specified, only show image scramble status and exit, default: false
+        multi (bool): If specified, allow images to be scrambled multiple times, default: false
     """
+    assert out_format in OUT_FORMATS, f"Invalid output format {out_format}, use one of {', '.join(OUT_FORMATS)}"
+    
     image_paths = list(filter(is_image, multi_file_arg(*file_paths, recursive=recursive)))
     
     assert image_paths, "No images found"

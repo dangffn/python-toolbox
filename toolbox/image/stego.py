@@ -398,40 +398,78 @@ class Container(io.RawIOBase):
         for _ in track(range(self.get_capacity()), description="Formatting..."):
             self.cursor.write(self.data, next(strategy))
         self.header.count = 0
+        
+        
+cli.register_help("image", "stego")("Convert images into containers for holding data.")
 
 
 @cli.register("image", "stego", "cat", positional="file_path")
 def cat(file_path: str, out_file: str="-") -> None:
+    """Read the contents of an image container.
+
+    Args:
+        file_path (str): path to an image container to read
+        out_file (str, optional): output file path, default: stdout
+    """
     with Container.open(file_path) as c:
         pipe_bytes(c, out_file)
 
 
 @cli.register("image", "stego", "write", positional="file_path")
 def write(file_path: str, data: str="-") -> None:
+    """Write data into an image container.
+
+    Args:
+        file_path (str): path to an image container to write to
+        data (str, optional): source file to write into the container, default: stdin
+    """
     with Container.open(file_path) as c:
         pipe_bytes(data, c)
 
 
 @cli.register("image", "stego", "initialize", positional="file_path")
 def initialize(file_path: str, force: bool=False) -> None:
+    """Initialize a new container from an image path.
+
+    Args:
+        file_path (str): path to an image file to convert into a container
+        force (bool, optional): whether to overwrite if the image is already a container, default: false
+    """
     with Container.open(file_path, initialize=True, force=force):
         pass
 
 
 @cli.register("image", "stego", "validate", positional="file_path")
 def validate(file_path: str, header_only: bool=False) -> None:
+    """Validate the structure of an image container.
+
+    Args:
+        file_path (str): path to an image container to validate
+        header_only (bool, optional): whether to run a (faster) header check only, default: false
+    """
     with Container.open(file_path) as c:
         c.validate(header_only)
 
 
 @cli.register("image", "stego", "format", positional="file_path", ignores=["strategy"])
 def format(file_path: str, strategy: Callable[[], Iterator[bytes]]) -> None:
+    """Format an image container, removes ALL stored data inside the container.
+
+    Args:
+        file_path (str): path to an image container to format
+        strategy (Callable[[], Iterator[bytes]]): the format strategy to use
+    """
     with Container.open(file_path) as c:
         c.format(strategy())
 
 
 @cli.register("image", "stego", "info", positional="file_path")
 def info(file_path: str) -> None:
+    """Show image container information.
+
+    Args:
+        file_path (str): path to an image container
+    """
     with Container.open(file_path) as c:
         table = Table(
             Column("Info", style="white"),
