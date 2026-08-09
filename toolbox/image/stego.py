@@ -217,8 +217,9 @@ class Cursor:
 
 class Container(io.RawIOBase):
     _supported_formats = ["RGB", "RGBA"]
+    mode: Literal["data", "raw"]
 
-    def __init__(self, filename: str, lsb: int = 2, preserve_alpha=True) -> None:
+    def __init__(self, filename: str, lsb: int = 2, preserve_alpha=True, mode: Literal["data", "raw"]="data") -> None:
         self.filename = os.path.abspath(filename)
         self.lsb = lsb
         self.img = Image.open(filename)
@@ -231,6 +232,7 @@ class Container(io.RawIOBase):
         self.header, self.header_end = Cursor.read_header(self.lsb, self.data)
         self.cursor: Cursor = Cursor(lsb)
         self.cursor.seek(self.header_end)
+        self.mode = mode
         
     def readable(self):
         return self.header.is_valid()
@@ -275,9 +277,10 @@ class Container(io.RawIOBase):
     @contextmanager
     @staticmethod
     def open(
-        filename: str, initialize: bool = False, force: bool = False
+        filename: str, initialize: bool = False, force: bool = False, mode: Literal["data", "raw"] = "data",
     ) -> Generator["Container", Any, Any]:
         container = Container(filename)
+        container.mode = mode
         if initialize:
             container.initialize(force)
         yield container
@@ -318,7 +321,12 @@ class Container(io.RawIOBase):
 
     def read(self, count: Optional[int] = None) -> bytes:
         assert self.header.is_valid(), "Attempt to read from an invalid container"
-        max_pos = self.header.count + self.header_end
+        if self.mode == "raw":
+            max_offset = self.get_capacity()
+        else:
+            max_offset = self.header_end
+            
+        max_pos = self.header.count + max_offset
         max_count = max_pos - self.cursor.pos
         if count is not None:
             if max_count < count:
@@ -404,15 +412,21 @@ cli.register_help("image", "stego")("Convert images into containers for holding 
 
 
 @cli.register("image", "stego", "cat", positional="file_path")
-def cat(file_path: str, out_file: str="-") -> None:
+def cat(file_path: str, out_file: str="-", raw: bool=False, count: int=None) -> None:
     """Read the contents of an image container.
 
     Args:
         file_path (str): path to an image container to read
         out_file (str, optional): output file path, default: stdout
+        raw (bool): if set, read the container bits directly, regardless of whether data was stored, default: false
     """
-    with Container.open(file_path) as c:
-        pipe_bytes(c, out_file)
+    mode = "data" if not raw else "raw"
+    with Container.open(file_path, mode=mode) as c:
+        if count is not None:
+            data = c.read(count)
+            pipe_bytes(data, out_file)
+        else:
+            pipe_bytes(c, out_file)
 
 
 @cli.register("image", "stego", "write", positional="file_path")
