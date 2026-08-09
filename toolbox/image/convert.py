@@ -158,9 +158,9 @@ def convert_images(paths: list[str], converters: list[Callable[[Image.Image], Im
     Args:
         paths (list[str]): Filenames or a folder to run conversions on
         converters (list[Callable]): Conversion functions to run on the images
-        overwrite_existing (bool, optional): Overwrite existing files. Defaults to false.
-        overwrite (bool, optional): Overwrite files if they already exist. Defaults to false.
-        recursive (bool, optional): Recursively search the path if a directory is specified
+        overwrite_existing (bool, optional): Overwrite input files, default: false
+        overwrite (bool, optional): Overwrite files if they already exist, default: false
+        recursive (bool, optional): Recursively search the path if a directory is specified, default: false
     """
     suffix = "_converted"
     filenames = list(filter(is_image, multi_file_arg(*paths, recursive=recursive)))

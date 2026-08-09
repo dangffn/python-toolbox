@@ -3,7 +3,7 @@
 from functools import reduce
 from typing import Any, Dict, Optional, Union, List, Literal, cast
 import re
-import json
+import json as json_
 import numpy as np
 from rich.table import Column, Table
 
@@ -149,15 +149,17 @@ class Config:
 
 
 @cli.register("net", "ipv4", positional="ip_address")
-def show_ip(ip_address: str, output: Literal["print", "json"]="print") -> None:
+def show_ip(ip_address: str, json: bool=False) -> None:
     """Show IPv4 address information.
     
     Args:
         ip_address (str): IP address with CIDR
-        output (str): The output format (print | json)
+        json (bool): Output the results as JSON
     """
     data = Config(ip_address).to_json()
-    if output == "print":
+    if json:
+        print(json_.dumps(data, indent=4))
+    else:
         table = Table(
             Column("Key", style="#444444"),
             Column("Value", style="cyan"),
@@ -170,5 +172,3 @@ def show_ip(ip_address: str, output: Literal["print", "json"]="print") -> None:
             else:
                 table.add_row(key, val)
         console.print(table)
-    else:
-        print(json.dumps(data, indent=4))

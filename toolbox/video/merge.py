@@ -16,7 +16,7 @@ def merge_video_files(file_paths: List[str], out_file: str="merged.mp4", recursi
     Args:
         file_paths (list[str]): Video files to merge together
         out_file (str): The output video file to save, default: merged.mp4
-        recursive (bool): If specified, search for video files recursively
+        recursive (bool): If specified, search for video files recursively, default: false
     """
     with console.status(f"Merging [green]{len(file_paths)}[/green] video files...") as status:
         video_files = multi_file_arg(*file_paths, recursive=recursive)

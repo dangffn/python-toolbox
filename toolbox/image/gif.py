@@ -7,6 +7,9 @@ from toolbox.utils import multi_file_arg, is_image, new_path_cleanup
 from toolbox.subcommands import cli
 
 
+cli.register_help("image", "gif")("Build or decompose animated GIFs.")
+
+
 @cli.register("image", "gif", "extract", positional="gif_file")
 def extract_images_from_gif(gif_file: Path | str, out_dir: Path | str="out"):
     """
