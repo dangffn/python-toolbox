@@ -1,7 +1,7 @@
 """IPv4 tools."""
 
 from functools import reduce
-from typing import Any, Dict, Optional, Union, List, Literal, cast
+from typing import Any, Dict, Optional, Union, List, cast
 import re
 import json as json_
 import numpy as np
