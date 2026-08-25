@@ -4,6 +4,7 @@ from rich.table import Column, Table
 import hashlib
 import os
 from PIL import Image
+from PIL.PngImagePlugin import PngInfo
 import numpy as np
 import cv2
 from pathlib import Path
@@ -138,6 +139,39 @@ def do_mod(pixel_array: np.ndarray, key: np.ndarray, do_scramble: bool=True):
     return pixel_array
 
 
+def _print_meta(filename: Path | str, image: Image.Image):
+    if image.info and len(image.info.items()) > 0:
+        table = Table(
+            Column("Key", style="white"),
+            Column("Value", style="cyan", width=50),
+            title=f"[cyan]Metadata[/] for [green]{filename}[/]",
+            border_style="#444444",
+        )
+        for key, val in image.info.items():
+            table.add_row(str(key), str(val))
+        console.print(table)
+    else:
+        console.log(f"{filename} has no metadata")
+
+
+def _merge_meta(source: Image.Image, target: Image.Image) -> PngInfo:
+    merged = { **source.info, **target.info }
+
+    meta = PngInfo()
+    for key, val in merged.items():
+        if not isinstance(key, str):
+            console.log(f"Skipping [white]{key}[/] [#444444](key type {type(key)} != str)[/]")
+            continue
+
+        if not isinstance(val, str):
+            console.log(f"Skipping [white]{key}[/] [#444444](value type {type(val)} != str)[/]")
+            continue
+
+        meta.add_text(key, val)
+
+    return meta
+
+
 @cli.register("image", "metadata", positional="file_paths", ignores=["kwargs"])
 def show_meta(file_paths: list[str], json: bool=False, **kwargs):
     """Show image metadata.
@@ -153,18 +187,34 @@ def show_meta(file_paths: list[str], json: bool=False, **kwargs):
             print(json_.dumps(image.info))
             continue
         
-        if image.info and len(image.info.items()) > 0:
-            table = Table(
-                Column("Key", style="white"),
-                Column("Value", style="cyan", width=50),
-                title=f"[cyan]Metadata[/] for [green]{filename}[/]",
-                border_style="#444444",
-            )
-            for key, val in image.info.items():
-                table.add_row(str(key), str(val))
-            console.print(table)
-        else:
-            console.log(f"{filename} has no metadata")
+        _print_meta(filename, image)
+
+
+
+
+@cli.register("image", "copy-metadata")
+def replace_metadata(source: str, target: str):
+    """Write metadata from one image file to another.
+
+    Args:
+        source (str): source image to pull metadata from
+        target (str): target image to write metadata to
+    """
+    assert is_image(source), f"{source} is not an image"
+    assert is_image(target), f"{target} is not an image"
+
+    image1 = Image.open(source)
+
+    if len(image1.info):
+        image2 = Image.open(target)
+
+        info = _merge_meta(image2, image1)
+        image2.save(target, pnginfo=info)
+        console.log(f"Wrote [green]{len(info.chunks):,}[/] chunks to [green]{target}[/]")
+        return True
+    else:
+        console.log(f"No metadata fields found on [#444444]{source}[/]")
+        return False
             
             
 def is_scrambled(path: Path | str):

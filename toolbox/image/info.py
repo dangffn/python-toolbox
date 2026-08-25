@@ -1,10 +1,14 @@
+from pathlib import Path
 from rich.table import Table
 import os
+import json as json_
+import imagehash
 from PIL import Image
-from typing import TypeVar, Generator, TypedDict, Literal, cast
+from typing import TypeVar, TypedDict, Literal, cast
 
 from toolbox.logger import console
-from toolbox.utils import bytes_str, walk_dir
+from toolbox.subcommands import cli
+from toolbox.utils import bytes_str, multi_file_arg, is_image
 
 
 T = TypeVar("T")
@@ -18,36 +22,70 @@ class Info(TypedDict):
     height: int
     width: int
     size: int
+    dhash: str
 
 
-def get_info(folder_path: str) -> Generator[Info, None, None]:
-    for file_path in walk_dir(folder_path):
-        try:
-            img = Image.open(file_path)
-            yield {
-                "name":os.path.basename(file_path),
-                "height": img.height,
-                "width": img.width,
-                "size": os.path.getsize(file_path)
-            }
-        except Exception:
-            pass
+def get_dhash(img: Image.Image):
+    return imagehash.dhash(img)
+
+
+def get_info(filename: Path | str) -> Info | None:
+    try:
+        img = Image.open(filename)
+        return {
+            "name":os.path.basename(filename),
+            "height": img.height,
+            "width": img.width,
+            "size": os.path.getsize(filename),
+            "dhash": str(get_dhash(img)),
+        }
+    except Exception:
+        pass
         
         
-def format(data: tuple[str, int | str]):
+def fmt_info(data: tuple[str, int | str]):
     key, val = data
     if key == "size":
         return bytes_str(cast(int, val))
     elif key in ["width", "height"]:
         return f"{val:,}"
-    return val
+    return str(val)
 
 
-def show_info(folder_path: str, sort: Sorters="size", reverse: bool=False) -> None:
-    table = Table("Name", "Height", "Width", "Size")
+@cli.register("image", "info", positional="file_paths")
+def show_info(file_paths: list[str], json: bool=False) -> None:
+    """Show image info.
+
+    Args:
+        file_paths (list[str]): file paths to show info for
+        json (bool): print output as json, default: false
+    """
+    table = Table("Name", "Height", "Width", "Size", "DHash", border_style="#444444")
+    output = []
     
-    info = list(get_info(folder_path))
-    
-    for inf in sorted(info, key=lambda info: info[sort], reverse=reverse):
-        table.add_row(*map(format, inf.items()))
-    console.print(table)
+    for filename in filter(is_image, multi_file_arg(*file_paths)):
+        info = get_info(filename)
+        if json:
+            output.append(info)
+        else:
+            table.add_row(*map(fmt_info, info.items() if info else {}))
+
+    if json:
+        print(json_.dumps(output))
+    else:
+        console.print(table)
+
+
+@cli.register("image", "find", positional="file_paths")
+def find_by_dhash(file_paths: list[str], dhashes: list[str]):
+    """Search for visually similar images via dhash values.
+
+    Args:
+        file_paths (list[str]): file paths to search in
+        dhashes (list[str]): a list of dhash values to compare against the searched images
+    """
+    matches = set(dhashes)
+    for filename in filter(is_image, multi_file_arg(*file_paths)):
+        actual = str(get_dhash(Image.open(filename)))
+        if actual in matches:
+            console.log(f"[green]{filename}[/] [#444444]({actual})[/]")
