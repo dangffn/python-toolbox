@@ -4,7 +4,7 @@ import docstring_parser
 import inspect
 from typing import Callable, TypeVar, Hashable, Generic, Any
 
-from toolbox.utils import find
+from toolbox.utils import find, as_array
 
 
 T = TypeVar("T", bound=Callable)
@@ -58,7 +58,7 @@ class Cli(Generic[P]):
         parsed_doc = docstring_parser.parse(func.__doc__ or "")
         return parsed_doc.short_description
     
-    def _add_args_from_func(self, parser: argparse.ArgumentParser, func: Callable[..., Any], ignores: list[str] | None=None, positional: str | None=None):
+    def _add_args_from_func(self, parser: argparse.ArgumentParser, func: Callable[..., Any], ignores: list[str] | None=None, positional: list[str] | str | None=None):
         arguments = inspect.signature(func)
         for name, param in arguments.parameters.items():
             if ignores and name in ignores:
@@ -74,8 +74,9 @@ class Cli(Generic[P]):
                 "help": self._get_param_help(func, name)
             }
             
-            is_positional = positional and name == positional
-            
+            # Whether this argument is positional.
+            is_positional = name in as_array(positional)
+                
             if param.default is not inspect.Parameter.empty:
                 kwargs["default"] = param.default
             else:
@@ -103,7 +104,6 @@ class Cli(Generic[P]):
     def register_arg_const(self, *subcommand: str, dest: str | None=None, ignores: list[str] | None=None, action: str="append_const"):
         def wrapper(func: T) -> T:
             arg_name = func.__name__.replace("_", "-")
-            
             parser = self._init_parser(subcommand, self._get_func_help(func))
             parser.add_argument(f"--{arg_name}", dest=dest, action=action, const=func, help=self._get_func_help(func))
             defaults = { dest: [] } if dest else {}
