@@ -3,14 +3,13 @@ from typing import Iterable
 from typing import Iterator
 import time
 import functools
-from typing import TypeVar, TypeVar, ParamSpec, Callable, Generator
+from typing import TypeVar, TypeVar, ParamSpec, Callable
 
 from toolbox.logger import console
 from toolbox.utils import time_delta_string
 
 
 T = TypeVar("T")
-V = TypeVar("V")
 P = ParamSpec("P")
 
 IteratorFunc = Callable[P, Iterator[T]]

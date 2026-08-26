@@ -1,5 +1,6 @@
+from types import TracebackType
 from concurrent.futures import ThreadPoolExecutor, Future, as_completed
-from typing import TypeVar, ParamSpec, TracebackType, Callable
+from typing import TypeVar, ParamSpec, Callable
 from rich.live import Live
 from rich.panel import Panel
 from rich.progress import track
