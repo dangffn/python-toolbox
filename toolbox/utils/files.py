@@ -6,7 +6,7 @@ import io
 from pathlib import Path
 from contextlib import contextmanager
 from hashlib import sha256
-from pillow_heif import register_heif_opener
+from pillow_heif import register_heif_opener  # type: ignore[import-untyped]
 import sys
 import os
 
@@ -36,8 +36,8 @@ def bytes_reader(path: Readable):
         assert Path(path).is_file(), f"{path} is not a file"
         with Path(path).open("rb") as infile:
             yield infile
-            
-            
+
+
 @contextmanager
 def bytes_writer(path: Writable):
     if path == "-":
@@ -51,19 +51,19 @@ def bytes_writer(path: Writable):
             
         with Path(path).open("wb") as infile:
             yield infile
-            
-            
+
+
 def write_bytes(data: Readable, path: Writable):
     with bytes_reader(data) as infile:
         with bytes_writer(path) as outfile:
             shutil.copyfileobj(infile, outfile)
-            
+
 
 def read_bytes(data: Readable):
     with bytes_reader(data) as infile:
         return infile.read()
-    
-    
+
+
 @contextmanager
 def new_path_cleanup(path: Path | str, is_file: bool=True):
     """Create the specified files, if an Exception occurs inside the context manager
@@ -83,32 +83,33 @@ def new_path_cleanup(path: Path | str, is_file: bool=True):
             elif delete.is_dir() and not os.listdir(delete):
                 delete.rmdir()
         raise
-            
-            
+
+
 def walk_dir(path: Path | str):
     p = Path(path)
     assert p.is_dir(), f"{path} is not a directory"
-    for root, folers, files in p.walk():
+    for root, _, files in p.walk():
         for f in files:
             yield root / f
-            
-            
+
+
 def list_dir(path: Path | str):
     assert Path(path).is_dir(), f"{path} is not a directory"
     for file in glob(f"{path}/*"):
         if Path(file).is_file():
             yield Path(file)
-            
-            
-def multi_file_arg(*path: Path | str, recursive=False):
+
+
+def multi_file_arg(*path: Path | str, recursive: bool=False) -> list[Path]:
     """Specify multiple files, or a single directory.
     If a directory is specified, return all files inside.
     """
-    files = path
+    files = list(map(Path, path))
     
     if len(path) > 1:
         files = filter(lambda p: Path(p).is_file(), list(path))
-    elif Path(path[0]).is_dir():
+        
+    elif path and Path(path[0]).is_dir():
         if recursive:
             files = walk_dir(path[0])
         else:
@@ -127,8 +128,8 @@ def is_image(path: Path | str):
         return True
     except (SyntaxError, OSError):
         return False
-    
-    
+
+
 def sha256_file(path: Readable):
     sha = sha256()
     with bytes_reader(path) as infile:

@@ -1,8 +1,10 @@
+from textual._path import CSSPathType
+from textual.driver import Driver
+from typing import Type
 from rich.text import Text
 from paramiko.ssh_exception import SSHException, AuthenticationException
 import getpass
 import os
-import stat
 from pathlib import Path
 from textual.widgets import DirectoryTree, Label
 from textual.widgets._directory_tree import DirEntry
@@ -34,11 +36,9 @@ class SshFileBrowser(DirectoryTree):
     def _get_directory_entries(self, path: Path) -> list[DirEntry]:
         entries: list[DirEntry] = []
         for attr in self.sftp.listdir_attr(str(path)):
-            attr.filename
             entries.append(
                 DirEntry(
                     path=self.PATH(attr.filename),
-                    is_dir=stat.S_ISDIR(attr.st_mode) if attr.st_mode else False,
                 )
             )
         return entries
@@ -48,18 +48,25 @@ class FileBrowserApp(App):
     path: str
     hostname: str
     username: str
-    
-    def __init__(self, *args, connection_str: str, port: int=22, **kwargs):
-        super().__init__(*args, **kwargs)
+
+    def __init__(
+        self,
+        connection_str: str,
+        port: int = 22,
+        driver_class: Type[Driver] | None = None,
+        css_path: CSSPathType | None = None,
+        watch_css: bool = False,
+        ansi_color: bool = False,
+    ):
+        super().__init__(driver_class, css_path, watch_css, ansi_color)
         self.port = port
-        
+
         # Determine the connection string + path.
         connection_str, self.path = connection_str.split(":", maxsplit=1) if "/" in connection_str else (connection_str, os.sep)
         # Determine the username + hostname.
         self.username, self.hostname = connection_str.split("@") if "@" in connection_str else (getpass.getuser(), connection_str)
         self.conn_str = f"{self.username}@{self.hostname}"
-        
-        
+
     def compose(self) -> ComposeResult:
         err = None
         try:
@@ -69,16 +76,16 @@ class FileBrowserApp(App):
                 username=self.username,
                 port=self.port,
             )
-        except SSHException as e:
-            err = f"Failed to connect to {self.conn_str} ({e})"
         except AuthenticationException as e:
             err = f"Failed to authenticate with server {self.conn_str} ({e})"
-            
+        except SSHException as e:
+            err = f"Failed to connect to {self.conn_str} ({e})"
+
         if err:
             console_err.log(err)
             yield Label(Text(err, style="red"))
-        
-        
+
+
 def ssh_browser(connection_str: str, port: int=22) :
     app = FileBrowserApp(connection_str=connection_str, port=port)
     app.run()

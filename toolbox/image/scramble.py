@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+from toolbox.functions.threads import ProgressExecutor
 from rich.table import Column, Table
 import hashlib
 import os
@@ -172,24 +173,21 @@ def _merge_meta(source: Image.Image, target: Image.Image) -> PngInfo:
     return meta
 
 
-@cli.register("image", "metadata", positional="file_paths", ignores=["kwargs"])
-def show_meta(file_paths: list[str], json: bool=False, **kwargs):
+@cli.register("image", "metadata", positional="file_paths")
+def show_meta(file_paths: list[str], json: bool=False):
     """Show image metadata.
 
     Args:
         file_paths (list[str]): a list of files to read metadata from
         json (bool, optional): output JSON formatted data, default: false
     """
-    image_paths = list(filter(is_image, multi_file_arg(*file_paths)))
-    for filename in image_paths:
+    for filename in filter(is_image, multi_file_arg(*file_paths)):
         image = Image.open(filename)
         if json:
             print(json_.dumps(image.info))
             continue
-        
+
         _print_meta(filename, image)
-
-
 
 
 @cli.register("image", "copy-metadata")
@@ -215,9 +213,9 @@ def replace_metadata(source: str, target: str):
     else:
         console.log(f"No metadata fields found on [#444444]{source}[/]")
         return False
-            
-            
-def is_scrambled(path: Path | str):
+
+
+def is_scrambled(path: Path | str) -> tuple[bool, float]:
     img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
     if img is None:
         return False, -1.0
@@ -225,21 +223,28 @@ def is_scrambled(path: Path | str):
     diff_h = np.abs(img[:, :-1].astype(np.int16) - img[:, 1:].astype(np.int16))
     diff_v = np.abs(img[:-1, :].astype(np.int16) - img[1:, :].astype(np.int16))
     mean_diff = (np.mean(diff_h) + np.mean(diff_v))
-    scrambled = (mean_diff > DIFF_THRESHOLD).all()
+    scrambled = bool((mean_diff > DIFF_THRESHOLD).all())
     
     # console.log(f"Mean difference: {mean_diff} for {path} scrambled={scrambled}")
     
-    return scrambled, mean_diff
+    return scrambled, float(mean_diff)
 
-            
+
 def check_scrambled(file_paths: list[Path]):
     table = Table("Path", "Scrambled", "Mean Diff", border_style="#444444")
     
-    for img in list(filter(is_image, multi_file_arg(*file_paths))):
+    def do(img: Path | str):
         scrambled, diff = is_scrambled(img)
-        clr = "green" if scrambled else "#444444"
-        table.add_row(str(img), f"[{clr}]{'scrambled' if scrambled else 'not scrambled'}[/]", f"{diff:.2f} / {DIFF_THRESHOLD:.2f}")
-        
+        return Path(img), scrambled, diff
+    
+    with ProgressExecutor[tuple[Path, bool, float]]() as executor:
+        for img in file_paths:
+            executor.submit(do, img)
+            
+        for img, scrambled, diff in executor.as_completed_progress("Scanning images"):
+            clr = "green" if scrambled else "#444444"
+            table.add_row(str(img), f"[{clr}]{'scrambled' if scrambled else 'not scrambled'}[/]", f"{diff:.2f} / {DIFF_THRESHOLD:.2f}")
+
     console.print(table)
 
 
@@ -269,19 +274,18 @@ def scramble(
         multi (bool): If specified, allow images to be scrambled multiple times, default: false
     """
     assert out_format in OUT_FORMATS, f"Invalid output format {out_format}, use one of {', '.join(OUT_FORMATS)}"
-    
-    image_paths = list(filter(is_image, multi_file_arg(*file_paths, recursive=recursive)))
-    
+
+    image_paths: list[Path] = list(filter(lambda p: is_image(p), multi_file_arg(*file_paths, recursive=recursive)))
     assert image_paths, "No images found"
-    
+
     if check_only:
         check_scrambled(image_paths)
         return
-    
+
     key = ScrambleKey(password or b"").array
     op = "Scrambling" if not unscramble else "Unscrambling"
     new_ext = "jpg" if out_format == "JPEG" else "png"
-    
+
     with console.status(op) as status:
         for p in image_paths:
             scrambled, _ = is_scrambled(p)
@@ -292,9 +296,9 @@ def scramble(
                 if not scrambled and unscramble:
                     console.log(f"Skipping {p}")
                     continue
-            
+
             status.update(f"{op} [green]{p}[/green]")
-            
+
             initial_arr = load_image(p)
             scrambled_arr = do_mod(initial_arr, key, do_scramble=not unscramble)
 
@@ -303,6 +307,6 @@ def scramble(
                 out_name = os.path.splitext(p.name)[0] + f".{new_ext}"
                 new_path = Path(out_dir_ / out_name)
                 save_image(scrambled_arr, new_path, fmt=out_format)
-                
+
                 if remove_existing and p != new_path:
                     p.unlink()

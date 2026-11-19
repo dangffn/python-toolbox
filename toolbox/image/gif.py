@@ -22,13 +22,14 @@ def extract_images_from_gif(gif_file: Path | str, out_dir: Path | str="out"):
     assert Path(gif_file).is_file(), f"{gif_file} is not a file"
     with new_path_cleanup(out_dir, is_file=False) as out_dir:
         with Image.open(gif_file) as im:
-            frames = track(range(im.n_frames), description="Extracting frames")
+            n_frames = getattr(im, "n_frames", 1)
+            frames = track(range(n_frames), description="Extracting frames")
             for frame in frames:
                 im.seek(frame)
                 file_path = out_dir / f"frame_{frame:04d}.png"
                 im.save(file_path)
                 
-        console.log(f"Wrote [green]{im.n_frames:,}[/] images to [green]{out_dir}[/]")
+        console.log(f"Wrote [green]{n_frames:,}[/] images to [green]{out_dir}[/]")
     
     
 @cli.register("image", "gif", "build", positional="file_paths")

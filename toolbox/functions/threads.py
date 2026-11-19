@@ -1,30 +1,25 @@
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from types import TracebackType
-from concurrent.futures import ThreadPoolExecutor, Future, as_completed
-from typing import TypeVar, ParamSpec, Callable
+from typing import Any, Callable, ParamSpec, TypeVar
+
 from rich.live import Live
 from rich.panel import Panel
 from rich.progress import track
 
 from toolbox.logger import console
-from toolbox.types import with_signature
-
 
 T = TypeVar("T")
 P = ParamSpec("P")
 
 
-FutureFunc = Callable[[Future[T]], bool]
-
-noop: FutureFunc = lambda val: True
-
+def noop(val: object):
+    return True
 
 class ProgressExecutor[T](ThreadPoolExecutor):
     _futures: list[Future[T]]
-    _filter: FutureFunc[T]
+    _filter: Callable[[Future[T]], bool]
 
-    @with_signature(ThreadPoolExecutor.__init__)
-    # pyrefly: ignore [invalid-overload]
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
         self._futures = []
         self._filter = noop
@@ -34,14 +29,11 @@ class ProgressExecutor[T](ThreadPoolExecutor):
             self.shutdown(wait=False, cancel_futures=True)
 
     def filter(self, func: Callable[[T], bool]):
-        def _filter(val: Future[T]):
-            return func(val.result())
         self._filter = lambda val: func(val.result())
         return self
 
-    @with_signature(ThreadPoolExecutor.submit)
-    def submit(self, *args, **kwargs):
-        future: Future[T] = super().submit(*args, **kwargs)
+    def submit[**P](self, fn: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> Future[T]:
+        future = super().submit(fn, *args, **kwargs)
         self._futures.append(future)
         return future
 

@@ -125,15 +125,15 @@ class Cursor:
     def _get_bits(self) -> int:
         return self.lsb - ((self.pos * 8) % self.lsb)
 
-    def _seek(self, pos: Union[int, None]) -> Pos:
+    def get_seek_pos(self, pos: int | None) -> Pos:
         if pos is None:
             return self.pos, self.idx, self._get_bits()
         idx = (pos * 8) // self.lsb
         bits = self.lsb - ((pos * 8) % self.lsb)
         return pos, idx, bits
 
-    def seek(self, pos: Union[int, None]) -> Pos:
-        pos_ = self._seek(pos)
+    def seek(self, pos: int | None) -> Pos:
+        pos_ = self.get_seek_pos(pos)
         self.pos, self.idx, _ = pos_
         return pos_
 
@@ -219,7 +219,7 @@ class Container(io.RawIOBase):
     _supported_formats = ["RGB", "RGBA"]
     mode: Literal["data", "raw"]
 
-    def __init__(self, filename: str, lsb: int = 2, preserve_alpha=True, mode: Literal["data", "raw"]="data") -> None:
+    def __init__(self, filename: str, lsb: int = 2, preserve_alpha: bool=True, mode: Literal["data", "raw"]="data") -> None:
         self.filename = os.path.abspath(filename)
         self.lsb = lsb
         self.img = Image.open(filename)
@@ -233,20 +233,20 @@ class Container(io.RawIOBase):
         self.cursor: Cursor = Cursor(lsb)
         self.cursor.seek(self.header_end)
         self.mode = mode
-        
+
     def readable(self):
         return self.header.is_valid()
-    
+
     def writable(self):
         return self.header.is_valid()
-    
+
     def readinto(self, b: bytearray | Buffer) -> int:
         view: bytearray | memoryview = b if isinstance(b, bytearray) else memoryview(b)
         data = self.read(len(view))
         view[:len(data)] = data
         console.log(f"READ: {data.decode()}")
         return len(data)
-        
+
     @staticmethod
     def img_to_array(img: Image.Image, remove_alpha: bool) -> NDArray[np.uint8]:
         arr = np.asarray(img, dtype=np.uint8)
@@ -325,7 +325,7 @@ class Container(io.RawIOBase):
             max_offset = self.get_capacity()
         else:
             max_offset = self.header_end
-            
+
         max_pos = self.header.count + max_offset
         max_count = max_pos - self.cursor.pos
         if count is not None:
@@ -342,14 +342,14 @@ class Container(io.RawIOBase):
         self.write(data)
         self.seek(curr_pos)
 
-    def write(self, data: Union[str, bytes, Buffer]) -> None:
+    def write(self, data: str | bytes | Buffer) -> None:
         assert self.header.is_valid(), "Attempt to write to an invalid container"
-        
+
         with console.status("Writing data to pixel channel LSBs..."):
-            if isinstance(data, str):
-                data = data.encode()
             if isinstance(data, Buffer):
                 data = bytes(data)
+            if isinstance(data, str):
+                data = data.encode()
             self.cursor.write(self.data, data)
             self.header.count = len(data)
 
@@ -369,10 +369,11 @@ class Container(io.RawIOBase):
             status.update("Writing output image...")
             self.to_image().save(self.filename)
 
-    def seek(self, pos: Union[int, None]) -> Pos:
+    def seek(self, pos: int | None, whence: int=0):
+        # TODO: implement second positional arg.
         # Constrain the container seek position to the header boundary.
         pos = pos + self.header_end if pos is not None else None
-        return self.cursor.seek(pos)
+        return self.cursor.seek(pos)[0]
 
     def _initialize(self, force: bool = False) -> None:
         assert (
@@ -406,13 +407,13 @@ class Container(io.RawIOBase):
         for _ in track(range(self.get_capacity()), description="Formatting..."):
             self.cursor.write(self.data, next(strategy))
         self.header.count = 0
-        
-        
+
+
 cli.register_help("image", "stego")("Convert images into containers for holding data.")
 
 
 @cli.register("image", "stego", "cat", positional="file_path")
-def cat(file_path: str, out_file: str="-", raw: bool=False, count: int=None) -> None:
+def cat(file_path: str, out_file: str="-", raw: bool=False, count: int | None=None) -> None:
     """Read the contents of an image container.
 
     Args:
@@ -499,7 +500,7 @@ def info(file_path: str) -> None:
             Emoji("x", style="red")
             
         max_color_integrity = len(c.data) * 256
-        current_pos = c.cursor._seek(c.header.count)[1]
+        current_pos = c.cursor.get_seek_pos(c.header.count)[1]
         degredation = (get_mask(c.lsb) + 1) * current_pos
         current_color_integrity = ((max_color_integrity - degredation) / max_color_integrity) * 100
         integrity_color = "green" if current_color_integrity > 99 else "red"

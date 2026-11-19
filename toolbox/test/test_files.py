@@ -9,7 +9,7 @@ class Ok(Exception):
     pass
     
     
-def test_deleted_on_err(cleanup_dir):
+def test_deleted_on_err(cleanup_dir: Path):
     test_file = Path(cleanup_dir) / "one" / "two" / "three" / "four" / "test.txt"
     
     try:
@@ -23,7 +23,7 @@ def test_deleted_on_err(cleanup_dir):
     assert not os.listdir(cleanup_dir), "Not all paths have been cleaned up"
     
     
-def test_existing_files_kept(cleanup_dir):
+def test_existing_files_kept(cleanup_dir: Path):
     keep = [
         cleanup_dir / "test.txt",
         cleanup_dir / "one" / "test.txt",
@@ -54,7 +54,7 @@ def test_existing_files_kept(cleanup_dir):
     assert not (cleanup_dir / "one" / "two" / "three").exists(), "This should have been removed"
 
 
-def test_pipe_bytes(test_files):
+def test_pipe_bytes(test_files: tuple[Path, Path]):
     f1, f2 = test_files
     
     test_data = os.urandom(1_024)

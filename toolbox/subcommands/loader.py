@@ -7,7 +7,7 @@ from typing import Callable, TypeVar, Hashable, Generic, Any
 from toolbox.utils import find, as_array
 
 
-T = TypeVar("T", bound=Callable)
+T = TypeVar("T", bound=Callable[..., Any])
 P = TypeVar("P", bound=argparse.ArgumentParser)
 Func = Callable[[T], T]
 
@@ -106,7 +106,7 @@ class Cli(Generic[P]):
             arg_name = func.__name__.replace("_", "-")
             parser = self._init_parser(subcommand, self._get_func_help(func))
             parser.add_argument(f"--{arg_name}", dest=dest, action=action, const=func, help=self._get_func_help(func))
-            defaults = { dest: [] } if dest else {}
+            defaults: dict[str, list[str]] = { dest: [] } if dest else {}
             parser.set_defaults(**defaults)
             self._add_args_from_func(parser, func, ignores)
             return func
@@ -123,7 +123,7 @@ class Cli(Generic[P]):
             
         return wrapper
     
-    def register_help(self, *subcommand):
+    def register_help(self, *subcommand: str):
         def wrapper(help: str):
             parser = self._init_parser(subcommand, help)
             parser.set_defaults(func=lambda: parser.print_usage())
