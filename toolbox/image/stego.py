@@ -5,16 +5,7 @@ from collections.abc import Buffer
 from typing import Generator
 from dataclasses import dataclass
 from hashlib import sha256
-from typing import (
-    Any,
-    Callable,
-    Iterator,
-    List,
-    Literal,
-    Tuple,
-    Union,
-    Optional,
-)
+from typing import Any, Callable, Iterator, Literal
 import io
 import os
 from random import randbytes
@@ -28,13 +19,12 @@ from rich.progress import track
 from rich.emoji import Emoji
 
 from toolbox.logger import console
-from toolbox.utils.binary import get_mask, split
-from toolbox.utils import bytes_str, pipe_bytes, find
+from toolbox.utils import bytes_str, pipe_bytes, find, get_mask, split
 from toolbox.subcommands import cli
 
 
-Pos = Tuple[int, int, int]
-Oper = Tuple[Pos, Pos, int, str]
+Pos = tuple[int, int, int]
+Oper = tuple[Pos, Pos, int, str]
 Strategy = Iterator[bytes]
 
 
@@ -68,7 +58,7 @@ class Header:
 def record_op(kind: Literal["read", "write"]) -> Callable[..., Any]:
     def inner(func: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(self: "Cursor", *args: Any, **kwargs: Any) -> Any:
-            count = find(args, lambda a: isinstance(a, (int, str, bytes))) or 0
+            count: int | str | bytes = find(args, lambda a: isinstance(a, (int, str, bytes))) or 0
             if isinstance(count, (str, bytes)):
                 count = len(count)
             start = self.seek(None)
@@ -98,14 +88,14 @@ class Cursor:
         # into the individual color channels per image pixel. Larger LSB values allow for more
         # storage capacity, but further degrade the image quality.
         self.lsb = lsb
-        self.operations: List[Oper] = []
+        self.operations: list[Oper] = []
         self.pos: int = 0
         self.idx: int = 0
         self.lsb_mask = get_mask(lsb)
         self.msb_mask = get_mask(8 - lsb) << lsb
 
     @classmethod
-    def read_header(cls, lsb: int, array: NDArray[np.uint8]) -> Tuple[Header, int]:
+    def read_header(cls, lsb: int, array: NDArray[np.uint8]) -> tuple[Header, int]:
         cursor = Cursor(lsb)
         header = Header()
         header.magic_bytes = cursor.read(array, 2)
@@ -155,7 +145,7 @@ class Cursor:
         n_bits = min(self.lsb, max(0, n_bits))
         return get_mask(n_bits) << (self.lsb - n_bits)
 
-    def iter_bits(self, data: bytes, shift: int = 0) -> Iterator[Tuple[int, int]]:
+    def iter_bits(self, data: bytes, shift: int = 0) -> Iterator[tuple[int, int]]:
         q = 0
         first_shift = shift
 
@@ -319,7 +309,7 @@ class Container(io.RawIOBase):
         self.seek(curr_pos)
         return res
 
-    def read(self, count: Optional[int] = None) -> bytes:
+    def read(self, count: int | None = None) -> bytes:
         assert self.header.is_valid(), "Attempt to read from an invalid container"
         if self.mode == "raw":
             max_offset = self.get_capacity()
@@ -336,7 +326,7 @@ class Container(io.RawIOBase):
             count = max_count
         return self.cursor.read(self.data, count)
 
-    def write_from(self, data: Union[str, bytes], pos: int) -> None:
+    def write_from(self, data: str | bytes, pos: int) -> None:
         curr_pos = self.cursor.pos
         self.seek(pos)
         self.write(data)
@@ -357,7 +347,7 @@ class Container(io.RawIOBase):
         chk = sha256(self.read_from(self.header.count, 0)).digest()[:4]
         return chk
 
-    def save(self, filename: Optional[str] = None) -> None:
+    def save(self, filename: str | None = None) -> None:
         self.filename, _ = os.path.splitext(os.path.abspath(filename or self.filename))
         self.filename = f"{self.filename}.png"
 
