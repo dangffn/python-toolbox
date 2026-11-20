@@ -12,7 +12,7 @@ def cleanup_dir():
     
 
 @pytest.fixture
-def test_files(cleanup_dir):
+def test_files(cleanup_dir: Path):
     _, f1 = tempfile.mkstemp(prefix=f"{cleanup_dir}/test-file")
     _, f2 = tempfile.mkstemp(prefix=f"{cleanup_dir}/test-file")
     yield f1, f2

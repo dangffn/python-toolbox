@@ -1,40 +1,29 @@
-# pylint: disable=too-many-instance-attributes
 #!/usr/bin/env python3
 
 from collections.abc import Buffer
-from typing import Generator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from hashlib import sha256
-from typing import (
-    Any,
-    Callable,
-    Iterator,
-    List,
-    Literal,
-    Tuple,
-    Union,
-    Optional,
-)
 import io
 import os
 from random import randbytes
-from contextlib import contextmanager
-from PIL import Image
+from typing import Generator
+from typing import Any, Callable, Iterator, Literal
 
-from numpy.typing import NDArray
+from PIL import Image
 import numpy as np
-from rich.table import Table, Column
-from rich.progress import track
+from numpy.typing import NDArray
 from rich.emoji import Emoji
+from rich.progress import track
+from rich.table import Column, Table
 
 from toolbox.logger import console
-from toolbox.utils.binary import get_mask, split
-from toolbox.utils import bytes_str, pipe_bytes, find
 from toolbox.subcommands import cli
+from toolbox.utils import bytes_str, find, get_mask, pipe_bytes, split
 
 
-Pos = Tuple[int, int, int]
-Oper = Tuple[Pos, Pos, int, str]
+Pos = tuple[int, int, int]
+Oper = tuple[Pos, Pos, int, str]
 Strategy = Iterator[bytes]
 
 
@@ -68,7 +57,7 @@ class Header:
 def record_op(kind: Literal["read", "write"]) -> Callable[..., Any]:
     def inner(func: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(self: "Cursor", *args: Any, **kwargs: Any) -> Any:
-            count = find(args, lambda a: isinstance(a, (int, str, bytes))) or 0
+            count: int | str | bytes = find(args, lambda a: isinstance(a, (int, str, bytes))) or 0
             if isinstance(count, (str, bytes)):
                 count = len(count)
             start = self.seek(None)
@@ -98,14 +87,14 @@ class Cursor:
         # into the individual color channels per image pixel. Larger LSB values allow for more
         # storage capacity, but further degrade the image quality.
         self.lsb = lsb
-        self.operations: List[Oper] = []
+        self.operations: list[Oper] = []
         self.pos: int = 0
         self.idx: int = 0
         self.lsb_mask = get_mask(lsb)
         self.msb_mask = get_mask(8 - lsb) << lsb
 
     @classmethod
-    def read_header(cls, lsb: int, array: NDArray[np.uint8]) -> Tuple[Header, int]:
+    def read_header(cls, lsb: int, array: NDArray[np.uint8]) -> tuple[Header, int]:
         cursor = Cursor(lsb)
         header = Header()
         header.magic_bytes = cursor.read(array, 2)
@@ -125,15 +114,15 @@ class Cursor:
     def _get_bits(self) -> int:
         return self.lsb - ((self.pos * 8) % self.lsb)
 
-    def _seek(self, pos: Union[int, None]) -> Pos:
+    def get_seek_pos(self, pos: int | None) -> Pos:
         if pos is None:
             return self.pos, self.idx, self._get_bits()
         idx = (pos * 8) // self.lsb
         bits = self.lsb - ((pos * 8) % self.lsb)
         return pos, idx, bits
 
-    def seek(self, pos: Union[int, None]) -> Pos:
-        pos_ = self._seek(pos)
+    def seek(self, pos: int | None) -> Pos:
+        pos_ = self.get_seek_pos(pos)
         self.pos, self.idx, _ = pos_
         return pos_
 
@@ -155,7 +144,7 @@ class Cursor:
         n_bits = min(self.lsb, max(0, n_bits))
         return get_mask(n_bits) << (self.lsb - n_bits)
 
-    def iter_bits(self, data: bytes, shift: int = 0) -> Iterator[Tuple[int, int]]:
+    def iter_bits(self, data: bytes, shift: int = 0) -> Iterator[tuple[int, int]]:
         q = 0
         first_shift = shift
 
@@ -219,7 +208,7 @@ class Container(io.RawIOBase):
     _supported_formats = ["RGB", "RGBA"]
     mode: Literal["data", "raw"]
 
-    def __init__(self, filename: str, lsb: int = 2, preserve_alpha=True, mode: Literal["data", "raw"]="data") -> None:
+    def __init__(self, filename: str, lsb: int = 2, preserve_alpha: bool=True, mode: Literal["data", "raw"]="data") -> None:
         self.filename = os.path.abspath(filename)
         self.lsb = lsb
         self.img = Image.open(filename)
@@ -233,20 +222,20 @@ class Container(io.RawIOBase):
         self.cursor: Cursor = Cursor(lsb)
         self.cursor.seek(self.header_end)
         self.mode = mode
-        
+
     def readable(self):
         return self.header.is_valid()
-    
+
     def writable(self):
         return self.header.is_valid()
-    
+
     def readinto(self, b: bytearray | Buffer) -> int:
         view: bytearray | memoryview = b if isinstance(b, bytearray) else memoryview(b)
         data = self.read(len(view))
         view[:len(data)] = data
         console.log(f"READ: {data.decode()}")
         return len(data)
-        
+
     @staticmethod
     def img_to_array(img: Image.Image, remove_alpha: bool) -> NDArray[np.uint8]:
         arr = np.asarray(img, dtype=np.uint8)
@@ -319,13 +308,13 @@ class Container(io.RawIOBase):
         self.seek(curr_pos)
         return res
 
-    def read(self, count: Optional[int] = None) -> bytes:
+    def read(self, count: int | None = None) -> bytes:
         assert self.header.is_valid(), "Attempt to read from an invalid container"
         if self.mode == "raw":
             max_offset = self.get_capacity()
         else:
             max_offset = self.header_end
-            
+
         max_pos = self.header.count + max_offset
         max_count = max_pos - self.cursor.pos
         if count is not None:
@@ -336,20 +325,20 @@ class Container(io.RawIOBase):
             count = max_count
         return self.cursor.read(self.data, count)
 
-    def write_from(self, data: Union[str, bytes], pos: int) -> None:
+    def write_from(self, data: str | bytes, pos: int) -> None:
         curr_pos = self.cursor.pos
         self.seek(pos)
         self.write(data)
         self.seek(curr_pos)
 
-    def write(self, data: Union[str, bytes, Buffer]) -> None:
+    def write(self, data: str | bytes | Buffer) -> None:
         assert self.header.is_valid(), "Attempt to write to an invalid container"
-        
+
         with console.status("Writing data to pixel channel LSBs..."):
-            if isinstance(data, str):
-                data = data.encode()
             if isinstance(data, Buffer):
                 data = bytes(data)
+            if isinstance(data, str):
+                data = data.encode()
             self.cursor.write(self.data, data)
             self.header.count = len(data)
 
@@ -357,7 +346,7 @@ class Container(io.RawIOBase):
         chk = sha256(self.read_from(self.header.count, 0)).digest()[:4]
         return chk
 
-    def save(self, filename: Optional[str] = None) -> None:
+    def save(self, filename: str | None = None) -> None:
         self.filename, _ = os.path.splitext(os.path.abspath(filename or self.filename))
         self.filename = f"{self.filename}.png"
 
@@ -369,10 +358,11 @@ class Container(io.RawIOBase):
             status.update("Writing output image...")
             self.to_image().save(self.filename)
 
-    def seek(self, pos: Union[int, None]) -> Pos:
+    def seek(self, pos: int | None, whence: int=0):
+        # TODO: implement second positional arg.
         # Constrain the container seek position to the header boundary.
         pos = pos + self.header_end if pos is not None else None
-        return self.cursor.seek(pos)
+        return self.cursor.seek(pos)[0]
 
     def _initialize(self, force: bool = False) -> None:
         assert (
@@ -406,13 +396,13 @@ class Container(io.RawIOBase):
         for _ in track(range(self.get_capacity()), description="Formatting..."):
             self.cursor.write(self.data, next(strategy))
         self.header.count = 0
-        
-        
+
+
 cli.register_help("image", "stego")("Convert images into containers for holding data.")
 
 
 @cli.register("image", "stego", "cat", positional="file_path")
-def cat(file_path: str, out_file: str="-", raw: bool=False, count: int=None) -> None:
+def cat_container(file_path: str, out_file: str="-", raw: bool=False, count: int | None=None) -> None:
     """Read the contents of an image container.
 
     Args:
@@ -430,7 +420,7 @@ def cat(file_path: str, out_file: str="-", raw: bool=False, count: int=None) -> 
 
 
 @cli.register("image", "stego", "write", positional="file_path")
-def write(file_path: str, data: str="-") -> None:
+def write_container(file_path: str, data: str="-") -> None:
     """Write data into an image container.
 
     Args:
@@ -442,7 +432,7 @@ def write(file_path: str, data: str="-") -> None:
 
 
 @cli.register("image", "stego", "initialize", positional="file_path")
-def initialize(file_path: str, force: bool=False) -> None:
+def initialize_container(file_path: str, force: bool=False) -> None:
     """Initialize a new container from an image path.
 
     Args:
@@ -454,7 +444,7 @@ def initialize(file_path: str, force: bool=False) -> None:
 
 
 @cli.register("image", "stego", "validate", positional="file_path")
-def validate(file_path: str, header_only: bool=False) -> None:
+def validate_container(file_path: str, header_only: bool=False) -> None:
     """Validate the structure of an image container.
 
     Args:
@@ -466,7 +456,7 @@ def validate(file_path: str, header_only: bool=False) -> None:
 
 
 @cli.register("image", "stego", "format", positional="file_path", ignores=["strategy"])
-def format(file_path: str, strategy: Callable[[], Iterator[bytes]]) -> None:
+def format_container(file_path: str, strategy: Callable[[], Iterator[bytes]]) -> None:
     """Format an image container, removes ALL stored data inside the container.
 
     Args:
@@ -499,7 +489,7 @@ def info(file_path: str) -> None:
             Emoji("x", style="red")
             
         max_color_integrity = len(c.data) * 256
-        current_pos = c.cursor._seek(c.header.count)[1]
+        current_pos = c.cursor.get_seek_pos(c.header.count)[1]
         degredation = (get_mask(c.lsb) + 1) * current_pos
         current_color_integrity = ((max_color_integrity - degredation) / max_color_integrity) * 100
         integrity_color = "green" if current_color_integrity > 99 else "red"

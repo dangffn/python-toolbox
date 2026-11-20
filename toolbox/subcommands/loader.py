@@ -2,12 +2,13 @@
 import argparse
 import docstring_parser
 import inspect
-from typing import Callable, TypeVar, Hashable, Generic, Any
+from types import NoneType, UnionType
+from typing import Callable, TypeVar, Hashable, Generic, Any, TypeAliasType, Union, get_args, get_origin
 
-from toolbox.utils import find
+from toolbox.utils import find, as_array
 
 
-T = TypeVar("T", bound=Callable)
+T = TypeVar("T", bound=Callable[..., Any])
 P = TypeVar("P", bound=argparse.ArgumentParser)
 Func = Callable[[T], T]
 
@@ -58,24 +59,42 @@ class Cli(Generic[P]):
         parsed_doc = docstring_parser.parse(func.__doc__ or "")
         return parsed_doc.short_description
     
-    def _add_args_from_func(self, parser: argparse.ArgumentParser, func: Callable[..., Any], ignores: list[str] | None=None, positional: str | None=None):
+    @staticmethod
+    def _unwrap_optional(annotation: Any) -> Any:
+        """Reduce `X | None` / `Optional[X]` to `X` and resolve `type` aliases.
+
+        Unions of several non-None types (e.g. `Path | str | None`) are returned
+        unchanged, which falls back to `str` handling.
+        """
+        while isinstance(annotation, TypeAliasType):
+            annotation = annotation.__value__
+
+        if get_origin(annotation) in (Union, UnionType):
+            args = [a for a in get_args(annotation) if a is not NoneType]
+            if len(args) == 1:
+                return Cli._unwrap_optional(args[0])
+
+        return annotation
+
+    def _add_args_from_func(self, parser: argparse.ArgumentParser, func: Callable[..., Any], ignores: list[str] | None=None, positional: list[str] | str | None=None):
         arguments = inspect.signature(func)
         for name, param in arguments.parameters.items():
             if ignores and name in ignores:
                 continue
             
-            type_ = param.annotation
+            type_ = self._unwrap_optional(param.annotation)
             try:
                 type_str = type_.__name__
             except AttributeError:
                 type_str = "str"
-            
+
             kwargs: dict[str, Any] = {
                 "help": self._get_param_help(func, name)
             }
             
-            is_positional = positional and name == positional
-            
+            # Whether this argument is positional.
+            is_positional = name in as_array(positional)
+                
             if param.default is not inspect.Parameter.empty:
                 kwargs["default"] = param.default
             else:
@@ -103,10 +122,9 @@ class Cli(Generic[P]):
     def register_arg_const(self, *subcommand: str, dest: str | None=None, ignores: list[str] | None=None, action: str="append_const"):
         def wrapper(func: T) -> T:
             arg_name = func.__name__.replace("_", "-")
-            
             parser = self._init_parser(subcommand, self._get_func_help(func))
             parser.add_argument(f"--{arg_name}", dest=dest, action=action, const=func, help=self._get_func_help(func))
-            defaults = { dest: [] } if dest else {}
+            defaults: dict[str, list[str]] = { dest: [] } if dest else {}
             parser.set_defaults(**defaults)
             self._add_args_from_func(parser, func, ignores)
             return func
@@ -123,7 +141,7 @@ class Cli(Generic[P]):
             
         return wrapper
     
-    def register_help(self, *subcommand):
+    def register_help(self, *subcommand: str):
         def wrapper(help: str):
             parser = self._init_parser(subcommand, help)
             parser.set_defaults(func=lambda: parser.print_usage())

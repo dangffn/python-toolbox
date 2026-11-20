@@ -1,27 +1,25 @@
-"""Utility functions to make life easier.
-"""
+"""String helper functions."""
 
-from typing import TypeVar, Callable
-
+from typing import TypeVar
+from datetime import timedelta
 
 T = TypeVar("T")
 
 
-def find(array: list[T] | tuple[T], func: Callable[[T], bool]) -> T | None:
-    """Similar to JavaScripts Array.find, return an item in an array that matches a 
-    filter function criteria.
 
-    Args:
-        array (Union[list[T], tuple[T]]): list of items to search
-        func (Callable[[T], bool]): lambda returning True for a successful match
+def pluralize(n: float, form: str | tuple[str, str]):
+    if isinstance(form, tuple):
+        singular, plural = form
+    else:
+        singular = form
+        plural = singular + "s"
+    return f"{number_str(n)} {singular if abs(n) == 1 else plural}"
 
-    Returns:
-        Optional[T]: item that matches the search function criteria
-    """
-    for item in array:
-        if func(item):
-            return item
-    return None
+
+def number_str(n: float | int):
+    if int(n) == n:
+        n = int(n)
+    return f"{n:,.2f}" if isinstance(n, float) else f"{n:,}"
 
 
 def bytes_str(num: float | int) -> str:
@@ -30,35 +28,41 @@ def bytes_str(num: float | int) -> str:
     :param int num: number to format
     :return str: formatted string
     """
-    suffix = ["bytes", "kb", "mb", "gb", "tb", "pb"]
+    suffix = ["byte", ("KB", "KB"), ("MB", "MB"), ("GB", "GB"), ("TB", "TB"), ("PB", "PB")]
     idx = 0
-    while num > 1_024 and idx < len(suffix):
+    while abs(num) >= 1_024 and idx < len(suffix):
         num /= 1_024
         idx += 1
     if idx == 0:
         num = int(num)
-        return f"{num:,} {suffix[idx]}"
-    return f"{num:,.2f} {suffix[idx]}"
+    return pluralize(num, suffix[idx])
 
 
-def time_delta_string(num: int) -> str:
+def timedelta_str(num: timedelta | int | float) -> str:
     """Friendly time delta string. Ie: 12min 34sec
 
-    :param int num: time delta in seconds
+    :param int | float num: time delta in seconds
     :return str: formatted string
     """
+    if isinstance(num, timedelta):
+        num = num.total_seconds()
+        
     times = {
         3600 * 24 * 365: "year",
         3600 * 24 * 7: "week",
         3600 * 24: "day",
         3600: "hour",
         60: "minute",
-        1: "sec"
+        1: "second",
+        0.001: ("ms", "ms"),
+        0.000001: ("μs", "μs"),
+        0.000000001: ("ns", "ns"),
+        0.000000000001: ("ps", "ps"),
     }
     string: list[str] = []
     for val, key in times.items():
         incr = int(num / val)
-        if incr > 0:
-            string.append(f"{incr:,} {key}{'s' if incr > 1 and key != 'sec' else ''}")
-            num -= (incr * val)
-    return f"{' '.join(string)}"
+        if abs(incr) > 0:
+            string.append(pluralize(incr, key))
+            num -= incr * val
+    return f"{' '.join(string)}" if string else "0 seconds"

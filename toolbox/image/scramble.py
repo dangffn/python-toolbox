@@ -1,18 +1,21 @@
 #!/usr/bin/python3
 
-from rich.table import Column, Table
 import hashlib
+import json as json_
 import os
-from PIL import Image
-import numpy as np
-import cv2
 from pathlib import Path
 from typing import Literal
-import json as json_
 
+from PIL import Image
+from PIL.PngImagePlugin import PngInfo
+import cv2
+import numpy as np
+from rich.table import Column, Table
+
+from toolbox.functions.threads import ProgressExecutor
 from toolbox.logger import console
-from toolbox.utils import is_image, multi_file_arg, new_path_cleanup
 from toolbox.subcommands import cli
+from toolbox.utils import is_image, multi_file_arg, new_path_cleanup
 
 
 Pixels = np.ndarray[tuple[int, ...]]
@@ -138,36 +141,82 @@ def do_mod(pixel_array: np.ndarray, key: np.ndarray, do_scramble: bool=True):
     return pixel_array
 
 
-@cli.register("image", "metadata", positional="file_paths", ignores=["kwargs"])
-def show_meta(file_paths: list[str], json: bool=False, **kwargs):
+def _print_meta(filename: Path | str, image: Image.Image):
+    if image.info and len(image.info.items()) > 0:
+        table = Table(
+            Column("Key", style="white"),
+            Column("Value", style="cyan", width=50),
+            title=f"[cyan]Metadata[/] for [green]{filename}[/]",
+            border_style="#444444",
+        )
+        for key, val in image.info.items():
+            table.add_row(str(key), str(val))
+        console.print(table)
+    else:
+        console.log(f"{filename} has no metadata")
+
+
+def _merge_meta(source: Image.Image, target: Image.Image) -> PngInfo:
+    merged = { **source.info, **target.info }
+
+    meta = PngInfo()
+    for key, val in merged.items():
+        if not isinstance(key, str):
+            console.log(f"Skipping [white]{key}[/] [#444444](key type {type(key)} != str)[/]")
+            continue
+
+        if not isinstance(val, str):
+            console.log(f"Skipping [white]{key}[/] [#444444](value type {type(val)} != str)[/]")
+            continue
+
+        meta.add_text(key, val)
+
+    return meta
+
+
+@cli.register("image", "metadata", positional="file_paths")
+def show_meta(file_paths: list[str], json: bool=False):
     """Show image metadata.
 
     Args:
         file_paths (list[str]): a list of files to read metadata from
         json (bool, optional): output JSON formatted data, default: false
     """
-    image_paths = list(filter(is_image, multi_file_arg(*file_paths)))
-    for filename in image_paths:
+    for filename in filter(is_image, multi_file_arg(*file_paths)):
         image = Image.open(filename)
         if json:
             print(json_.dumps(image.info))
             continue
-        
-        if image.info and len(image.info.items()) > 0:
-            table = Table(
-                Column("Key", style="white"),
-                Column("Value", style="cyan", width=50),
-                title=f"[cyan]Metadata[/] for [green]{filename}[/]",
-                border_style="#444444",
-            )
-            for key, val in image.info.items():
-                table.add_row(str(key), str(val))
-            console.print(table)
-        else:
-            console.log(f"{filename} has no metadata")
-            
-            
-def is_scrambled(path: Path | str):
+
+        _print_meta(filename, image)
+
+
+@cli.register("image", "copy-metadata")
+def replace_metadata(source: str, target: str):
+    """Write metadata from one image file to another.
+
+    Args:
+        source (str): source image to pull metadata from
+        target (str): target image to write metadata to
+    """
+    assert is_image(source), f"{source} is not an image"
+    assert is_image(target), f"{target} is not an image"
+
+    image1 = Image.open(source)
+
+    if len(image1.info):
+        image2 = Image.open(target)
+
+        info = _merge_meta(image2, image1)
+        image2.save(target, pnginfo=info)
+        console.log(f"Wrote [green]{len(info.chunks):,}[/] chunks to [green]{target}[/]")
+        return True
+    else:
+        console.log(f"No metadata fields found on [#444444]{source}[/]")
+        return False
+
+
+def is_scrambled(path: Path | str) -> tuple[bool, float]:
     img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
     if img is None:
         return False, -1.0
@@ -175,21 +224,28 @@ def is_scrambled(path: Path | str):
     diff_h = np.abs(img[:, :-1].astype(np.int16) - img[:, 1:].astype(np.int16))
     diff_v = np.abs(img[:-1, :].astype(np.int16) - img[1:, :].astype(np.int16))
     mean_diff = (np.mean(diff_h) + np.mean(diff_v))
-    scrambled = (mean_diff > DIFF_THRESHOLD).all()
+    scrambled = bool((mean_diff > DIFF_THRESHOLD).all())
     
     # console.log(f"Mean difference: {mean_diff} for {path} scrambled={scrambled}")
     
-    return scrambled, mean_diff
+    return scrambled, float(mean_diff)
 
-            
+
 def check_scrambled(file_paths: list[Path]):
     table = Table("Path", "Scrambled", "Mean Diff", border_style="#444444")
     
-    for img in list(filter(is_image, multi_file_arg(*file_paths))):
+    def do(img: Path | str):
         scrambled, diff = is_scrambled(img)
-        clr = "green" if scrambled else "#444444"
-        table.add_row(str(img), f"[{clr}]{'scrambled' if scrambled else 'not scrambled'}[/]", f"{diff:.2f} / {DIFF_THRESHOLD:.2f}")
-        
+        return Path(img), scrambled, diff
+    
+    with ProgressExecutor[tuple[Path, bool, float]]() as executor:
+        for img in file_paths:
+            executor.submit(do, img)
+            
+        for img, scrambled, diff in executor.as_completed_progress("Scanning images"):
+            clr = "green" if scrambled else "#444444"
+            table.add_row(str(img), f"[{clr}]{'scrambled' if scrambled else 'not scrambled'}[/]", f"{diff:.2f} / {DIFF_THRESHOLD:.2f}")
+
     console.print(table)
 
 
@@ -219,19 +275,18 @@ def scramble(
         multi (bool): If specified, allow images to be scrambled multiple times, default: false
     """
     assert out_format in OUT_FORMATS, f"Invalid output format {out_format}, use one of {', '.join(OUT_FORMATS)}"
-    
+
     image_paths = list(filter(is_image, multi_file_arg(*file_paths, recursive=recursive)))
-    
     assert image_paths, "No images found"
-    
+
     if check_only:
         check_scrambled(image_paths)
         return
-    
+
     key = ScrambleKey(password or b"").array
     op = "Scrambling" if not unscramble else "Unscrambling"
     new_ext = "jpg" if out_format == "JPEG" else "png"
-    
+
     with console.status(op) as status:
         for p in image_paths:
             scrambled, _ = is_scrambled(p)
@@ -242,9 +297,9 @@ def scramble(
                 if not scrambled and unscramble:
                     console.log(f"Skipping {p}")
                     continue
-            
+
             status.update(f"{op} [green]{p}[/green]")
-            
+
             initial_arr = load_image(p)
             scrambled_arr = do_mod(initial_arr, key, do_scramble=not unscramble)
 
@@ -253,6 +308,6 @@ def scramble(
                 out_name = os.path.splitext(p.name)[0] + f".{new_ext}"
                 new_path = Path(out_dir_ / out_name)
                 save_image(scrambled_arr, new_path, fmt=out_format)
-                
+
                 if remove_existing and p != new_path:
                     p.unlink()

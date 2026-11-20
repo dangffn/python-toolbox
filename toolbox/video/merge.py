@@ -1,5 +1,5 @@
 from typing import List
-from moviepy import VideoFileClip, concatenate_videoclips
+from moviepy import VideoFileClip, concatenate_videoclips  # type: ignore[import-untyped]
 
 from toolbox.logger import console
 from toolbox.utils import multi_file_arg
