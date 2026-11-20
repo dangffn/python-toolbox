@@ -3,7 +3,7 @@ from toolbox.image.gif import *  # noqa
 from toolbox.image.info import *  # noqa
 from toolbox.image.scramble import *  # noqa
 from toolbox.image.stego import *  # noqa
-from toolbox.image.view import *  # noqa
+from toolbox.image.view import view_image  # noqa
 
 from toolbox.subcommands.loader import cli
 cli.register_help("image")("Image manipulation commands")
