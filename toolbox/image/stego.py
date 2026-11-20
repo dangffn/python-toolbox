@@ -1,26 +1,25 @@
-# pylint: disable=too-many-instance-attributes
 #!/usr/bin/env python3
 
 from collections.abc import Buffer
-from typing import Generator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from hashlib import sha256
-from typing import Any, Callable, Iterator, Literal
 import io
 import os
 from random import randbytes
-from contextlib import contextmanager
-from PIL import Image
+from typing import Generator
+from typing import Any, Callable, Iterator, Literal
 
-from numpy.typing import NDArray
+from PIL import Image
 import numpy as np
-from rich.table import Table, Column
-from rich.progress import track
+from numpy.typing import NDArray
 from rich.emoji import Emoji
+from rich.progress import track
+from rich.table import Column, Table
 
 from toolbox.logger import console
-from toolbox.utils import bytes_str, pipe_bytes, find, get_mask, split
 from toolbox.subcommands import cli
+from toolbox.utils import bytes_str, find, get_mask, pipe_bytes, split
 
 
 Pos = tuple[int, int, int]
@@ -403,7 +402,7 @@ cli.register_help("image", "stego")("Convert images into containers for holding 
 
 
 @cli.register("image", "stego", "cat", positional="file_path")
-def cat(file_path: str, out_file: str="-", raw: bool=False, count: int | None=None) -> None:
+def cat_container(file_path: str, out_file: str="-", raw: bool=False, count: int | None=None) -> None:
     """Read the contents of an image container.
 
     Args:
@@ -421,7 +420,7 @@ def cat(file_path: str, out_file: str="-", raw: bool=False, count: int | None=No
 
 
 @cli.register("image", "stego", "write", positional="file_path")
-def write(file_path: str, data: str="-") -> None:
+def write_container(file_path: str, data: str="-") -> None:
     """Write data into an image container.
 
     Args:
@@ -433,7 +432,7 @@ def write(file_path: str, data: str="-") -> None:
 
 
 @cli.register("image", "stego", "initialize", positional="file_path")
-def initialize(file_path: str, force: bool=False) -> None:
+def initialize_container(file_path: str, force: bool=False) -> None:
     """Initialize a new container from an image path.
 
     Args:
@@ -445,7 +444,7 @@ def initialize(file_path: str, force: bool=False) -> None:
 
 
 @cli.register("image", "stego", "validate", positional="file_path")
-def validate(file_path: str, header_only: bool=False) -> None:
+def validate_container(file_path: str, header_only: bool=False) -> None:
     """Validate the structure of an image container.
 
     Args:
@@ -457,7 +456,7 @@ def validate(file_path: str, header_only: bool=False) -> None:
 
 
 @cli.register("image", "stego", "format", positional="file_path", ignores=["strategy"])
-def format(file_path: str, strategy: Callable[[], Iterator[bytes]]) -> None:
+def format_container(file_path: str, strategy: Callable[[], Iterator[bytes]]) -> None:
     """Format an image container, removes ALL stored data inside the container.
 
     Args:

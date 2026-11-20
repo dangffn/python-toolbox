@@ -1,17 +1,33 @@
-from textual._path import CSSPathType
-from textual.driver import Driver
-from typing import Type
-from rich.text import Text
-from paramiko.ssh_exception import SSHException, AuthenticationException
 import getpass
 import os
 from pathlib import Path
+from typing import Type
+
+import paramiko
+from paramiko.ssh_exception import AuthenticationException, SSHException
+from rich.text import Text
+from textual._path import CSSPathType
+from textual.app import App, ComposeResult
+from textual.driver import Driver
 from textual.widgets import DirectoryTree, Label
 from textual.widgets._directory_tree import DirEntry
-from textual.app import App, ComposeResult
-import paramiko
 
 from toolbox.logger import console_err
+from toolbox.subcommands.loader import cli
+
+
+def use_identity_agent(hostname: str) -> None:
+    """Point paramiko at the `IdentityAgent` from ~/.ssh/config (e.g. 1Password).
+
+    Paramiko ignores `IdentityAgent` and only reads `SSH_AUTH_SOCK`, so set that.
+    """
+    config_path = Path("~/.ssh/config").expanduser()
+    if not config_path.is_file():
+        return
+
+    agent = paramiko.SSHConfig.from_path(str(config_path)).lookup(hostname).get("identityagent")
+    if agent and agent not in ("none", "SSH_AUTH_SOCK"):
+        os.environ["SSH_AUTH_SOCK"] = os.path.expanduser(agent)
 
 
 class SshFileBrowser(DirectoryTree):
@@ -25,6 +41,7 @@ class SshFileBrowser(DirectoryTree):
     ) -> None:
         self.ssh = paramiko.SSHClient()
         self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        use_identity_agent(hostname)
         self.ssh.connect(hostname, username=username, allow_agent=True, port=port)
         self.sftp = self.ssh.open_sftp()
         super().__init__(path)
@@ -44,7 +61,7 @@ class SshFileBrowser(DirectoryTree):
         return entries
 
 
-class FileBrowserApp(App):
+class FileBrowserApp(App[None]):
     path: str
     hostname: str
     username: str
@@ -86,7 +103,14 @@ class FileBrowserApp(App):
             yield Label(Text(err, style="red"))
 
 
+@cli.register("net", "ssh-browser", positional="connection_str")
 def ssh_browser(connection_str: str, port: int=22) :
+    """Display a TUI file browser over an SSH connection.
+
+    Args:
+        connection_str (str): username@hostname ssh connection string
+        port (int, optional): optional port number to use, default: 22
+    """
     app = FileBrowserApp(connection_str=connection_str, port=port)
     app.run()
 

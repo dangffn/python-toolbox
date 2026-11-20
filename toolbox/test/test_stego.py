@@ -1,16 +1,15 @@
-# pylint: disable=global-statement
 """Test cases for the stego subcommand.
 """
 
-from pathlib import Path
-import pytest
-from toolbox.utils import read_bytes
 import os
-import numpy as np
-from PIL import Image
+from pathlib import Path
 
-from toolbox.image.stego import Cursor, Container
-from toolbox.utils import pipe_bytes, write_bytes, split, get_mask
+from PIL import Image
+import numpy as np
+import pytest
+
+from toolbox.image import Container, Cursor
+from toolbox import utils
 
 
 @pytest.fixture
@@ -31,8 +30,8 @@ def image_container():
 
 
 def test_mask():
-    assert get_mask(8) == 0xFF
-    assert get_mask(3) == 0b111
+    assert utils.get_mask(8) == 0xFF
+    assert utils.get_mask(3) == 0b111
         
 def test_iter_bits(cursor: Cursor):
     """Split bytes into bit chunks.
@@ -66,10 +65,10 @@ def test_iter_bits(cursor: Cursor):
 def test_split():
     """Split integers by a bit mask.
     """
-    assert split(0xFF, 4) == (0xF, 0xF)
-    assert split(0xFF, 0) == (0xFF, 0x0)
-    assert split(0xFF, 8) == (0x0, 0xFF)
-    assert split(0xFF, -1) == (0xFF, 0x0)
+    assert utils.split(0xFF, 4) == (0xF, 0xF)
+    assert utils.split(0xFF, 0) == (0xFF, 0x0)
+    assert utils.split(0xFF, 8) == (0x0, 0xFF)
+    assert utils.split(0xFF, -1) == (0xFF, 0x0)
     
 def test_seek(cursor: Cursor):
     assert cursor.seek(0) == (0, 0, 3)
@@ -109,11 +108,11 @@ def test_container_write_bytes(container: Container):
     
 def test_container_pipes(container: Container, test_files: tuple[Path, Path]):
     f1, f2 = test_files
-    write_bytes(os.urandom(256), f1)
-    pipe_bytes(f1, container)
+    utils.write_bytes(os.urandom(256), f1)
+    utils.pipe_bytes(f1, container)
     container.seek(0)
-    pipe_bytes(container, f2)
-    assert read_bytes(f1) == read_bytes(f2)
+    utils.pipe_bytes(container, f2)
+    assert utils.read_bytes(f1) == utils.read_bytes(f2)
 
         
 def test_initialization(image_container: Container):

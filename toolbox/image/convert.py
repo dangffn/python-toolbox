@@ -42,7 +42,7 @@ def invert(img: Image.Image, **kwargs: Unpack[ConverterKwargs]):
 
 
 @cli.register_arg_const("image", "convert", dest="converters", ignores=["img"])
-def mod_channel(img: Image.Image, /, *, channel: str = None, modifier: float = None):
+def mod_channel(img: Image.Image, /, *, channel: str | None = None, modifier: float | None = None):
     """Apply a multiplier modifier to the specified channel.
     
     Args:
@@ -52,10 +52,13 @@ def mod_channel(img: Image.Image, /, *, channel: str = None, modifier: float = N
     assert channel is not None, "Channel is required"
     assert modifier is not None, "Modifier is required"
     assert 0 <= modifier <= 1, "Modifier must be between 0 and 1"
+    
+    def point(p: float):
+        return min(255, max(0, int(p * modifier)))
 
     rgba_img = img.convert("RGBA")
     data = dict(zip("RGBA", rgba_img.split()))
-    data[channel] = data[channel].point(lambda p: min(255, max(0, int(p * modifier))))
+    data[channel] = data[channel].point(point)
     return Image.merge("RGBA", (data["R"], data["G"], data["B"], data["A"]))
 
 

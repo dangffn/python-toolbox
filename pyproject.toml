@@ -39,6 +39,8 @@ dev = [
     "pytest-cov==7.0.0",
     "pyrefly==0.41.0",
     "ruff==0.14.6",
+    "pyright>=1.1.414",
+    "pylint>=4.1.4",
 ]
 
 [project.scripts]
@@ -52,3 +54,11 @@ strict = ["toolbox"]
 typeCheckingMode = "strict"
 exclude = ["**/__pycache__"]
 include = ["toolbox"]
+
+[tool.pylint.typecheck]
+# OpenCV adds its functions at import time, so pylint cannot see them.
+generated-members = ["cv2.*"]
+
+[tool.pylint."messages control"]
+# W0621: pytest fixtures are passed as arguments with the same name as the fixture.
+disable = ["redefined-outer-name"]

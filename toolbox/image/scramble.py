@@ -1,20 +1,21 @@
 #!/usr/bin/python3
 
-from toolbox.functions.threads import ProgressExecutor
-from rich.table import Column, Table
 import hashlib
+import json as json_
 import os
-from PIL import Image
-from PIL.PngImagePlugin import PngInfo
-import numpy as np
-import cv2
 from pathlib import Path
 from typing import Literal
-import json as json_
 
+from PIL import Image
+from PIL.PngImagePlugin import PngInfo
+import cv2
+import numpy as np
+from rich.table import Column, Table
+
+from toolbox.functions.threads import ProgressExecutor
 from toolbox.logger import console
-from toolbox.utils import is_image, multi_file_arg, new_path_cleanup
 from toolbox.subcommands import cli
+from toolbox.utils import is_image, multi_file_arg, new_path_cleanup
 
 
 Pixels = np.ndarray[tuple[int, ...]]
