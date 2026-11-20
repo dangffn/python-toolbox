@@ -276,7 +276,7 @@ def scramble(
     """
     assert out_format in OUT_FORMATS, f"Invalid output format {out_format}, use one of {', '.join(OUT_FORMATS)}"
 
-    image_paths: list[Path] = list(filter(lambda p: is_image(p), multi_file_arg(*file_paths, recursive=recursive)))
+    image_paths = list(filter(is_image, multi_file_arg(*file_paths, recursive=recursive)))
     assert image_paths, "No images found"
 
     if check_only:

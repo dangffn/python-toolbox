@@ -5,7 +5,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container
 from textual.widgets import Footer, Header
-from textual_imageview.viewer import ImageViewer
+from textual_imageview.viewer import ImageViewer  # pyright: ignore[reportMissingTypeStubs]
 
 from toolbox import utils
 from toolbox.logger import console_err
@@ -66,7 +66,7 @@ def view_image(file_paths: list[str]) -> None:
     Args:
         file_paths (list[str]): image files, or a directory of images, to view
     """
-    files = [Path(p) for p in utils.multi_file_arg(*file_paths) if utils.is_image(p)]
+    files = list(filter(utils.is_image, utils.multi_file_arg(*file_paths)))
     if not files:
         console_err.print("[red]No image files found[/]")
         return

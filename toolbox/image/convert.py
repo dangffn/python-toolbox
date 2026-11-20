@@ -211,7 +211,7 @@ def convert_images(paths: list[str], converters: list[Converter], overwrite_exis
         overwrite (bool, optional): Overwrite files if they already exist, default: false
         recursive (bool, optional): Recursively search the path if a directory is specified, default: false
     """
-    filenames: list[Path] = list(filter(lambda p: is_image(p), multi_file_arg(*paths, recursive=recursive)))
+    filenames = list(filter(is_image, multi_file_arg(*paths, recursive=recursive)))
     total = len(filenames)
 
     with ProgressExecutor[Path | None]() as executor:
